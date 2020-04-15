@@ -17,7 +17,10 @@ Usage: docsify <init|serve> <path>
 
 ### 在线阅读
 
-- 在线阅读地址：https://cnxiyou.gitee.io/blog-md/#/
+- 国内快速阅读地址：https://cnxiyou.gitee.io/blog-md/
+
+- github阅读地址（偏慢）https://houchenggong.github.io/blog-md/
+
 - Github：https://github.com/HouChenggong/blog-md
 
 
