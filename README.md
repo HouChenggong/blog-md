@@ -1,4 +1,30 @@
-# 希尤丨彦
+## 关于写这个的目的
+
+- 查漏补缺
+
+主要是收集了网上的一些**自己欠缺**或者**觉得应该要记住**的一些知识要点，原则上只是作为**自己的查漏补缺和复习使用**，不做网络推广，相当于自己的一个记事本。因为网上的相关内容太多，但是自己只需要记录自己需要的即可，这也是我为啥要写的原因，所以对于版权如有冒犯到您，请您谅解，或者与我沟通。
+
+主要收集来源：
+
+[java成神之路](https://hollischuang.github.io/toBeTopJavaer/#/)
+
+[javaGuide](https://snailclimb.gitee.io/javaguide-interview/#/)
+
+- 作为学习记录
+
+同时我也会把每天所学记录在这里面，比如每日算法，每日学习记录等等，算是作为一个学习记录
+
+
+
+## 感谢
+
+**前人种树，后人纳凉，感谢这两个博主，也感谢那些被我引用的某些知识点提供者的博主，谢谢你们！**
+
+
+
+## 如何搭建在线文档
+
+这个是我参考github的一个博主搭建，附上源地址连接
 
 [如何使用docsify搭建文档类型的网站](./docs/how-to-use-docsify.md)
 
@@ -15,7 +41,13 @@ Usage: docsify <init|serve> <path>
 
 然后执行`docsify init ./blog`这个时候会在当前目录创建一个bolg子目录
 
-### 在线阅读
+然后执行`docsify serve ./blog`
+
+输入http://localhost:3000/#/
+
+即可访问
+
+## 在线阅读
 
 - 国内快速阅读地址：https://cnxiyou.gitee.io/blog-md/
 
@@ -25,3 +57,10 @@ Usage: docsify <init|serve> <path>
 
 
 
+如果您对本项目中的内容有建议或者意见
+
+如果你对本项目中未完成的章节感兴趣
+
+欢迎提出专业方面的修改建议
+
+请直接在[GitHub](https://github.com/HouChenggong/blog-md)上以issue或者PR的形式提出
