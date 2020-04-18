@@ -3,8 +3,8 @@
 
 * Java
 
-  * [Java基础](./docs/java基础/java基础问题.md)
-  * [Java集合](./docs/b-2Java集合.md)
+  * [Java基础](./docs/Java基础/Java基础问题.md)
+  * [Java集合](./docs/java集合/Java集合.md)
   * [Java多线程](./docs/b-3Java多线程.md)
   * [jvm](./docs/b-4jvm.md)
 
