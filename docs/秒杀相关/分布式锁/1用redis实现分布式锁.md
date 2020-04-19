@@ -55,3 +55,357 @@ public class RedisConfig {
 }
 ```
 
+## 2. redis实现分布式锁（繁琐）
+
+```java
+ //TODO:借助Redis的原子操作实现分布式锁-对共享操作-资源进行控制
+ValueOperations valueOperations = stringRedisTemplate.opsForValue();
+ final String key = new StringBuffer().append(sid).append(userId).append("-RedisLock").toString();
+ final String value = RandomUtils.nextInt() + "";
+        //lua脚本提供“分布式锁服务”，就可以写在一起
+Boolean cacheRes = valueOperations.setIfAbsent(key, value);
+    if (cacheRes) {
+       stringRedisTemplate.expire(key, 10, TimeUnit.SECONDS);
+            try {
+               
+            } finally {
+              
+                if (value.equals(valueOperations.get(key).toString())) {
+                    stringRedisTemplate.delete(key);
+                }
+            }
+
+        } else {
+            return ServerResponse.createByErrorMessage("未获取到分布式锁，导致秒杀失败" + userId);
+        }
+```
+
+### 问题？set值之后服务器宕机了怎么办
+
+上述有一个问题，就是当执行
+
+```java
+Boolean cacheRes = valueOperations.setIfAbsent(key, value);
+```
+
+这个时候，redis宕机了怎么办？就会导致这个值会一直锁住，释放不了
+
+### 解决方案？LUA脚本把set值和失效时间绑到一起
+
+使用lua脚本，把set值和设置失效时间绑定到一起
+
+## 3更简单安全的redis分布式锁实现方式
+
+其实在提供`Redis`整合的团队里，由于分布式锁频繁的应用也有所改进，在高版本中通过`RedisTemplate`我们就可以实现`NX`和`EX`的连用。
+
+比如我们注入
+
+```java
+@Autowired
+private StringRedisTemplate stringRedisTemplate;
+```
+
+- 不用LUA照样可以一步实现setValue +expire
+
+```
+        //TODO:借助Redis的原子操作实现分布式锁-对共享操作-资源进行控制
+final String key = new StringBuffer().append(sid).append(userId).append("-RedisLock").toString();
+final String value = RandomUtils.nextInt() + "";
+        //lua脚本提供“分布式锁服务”，就可以写在一起
+Boolean cacheRes = stringRedisTemplate.opsForValue().setIfAbsent(key, value, 10, TimeUnit.SECONDS);
+  if (cacheRes) {
+            stringRedisTemplate.expire(key, 10, TimeUnit.SECONDS);
+            try {
+              
+            } finally {
+             
+                if (value.equals(stringRedisTemplate.opsForValue().get(key))) {
+                    stringRedisTemplate.delete(key);
+                }
+            }
+
+        } else {
+            return ServerResponse.createByErrorMessage("未获取到分布式锁，导致秒杀失败" + userId);
+        }
+```
+
+## 4. redission实现分布式锁
+
+```java
+final String locakKey = new StringBuffer().append(sid).append(userId).append("--redissionLock").toString();
+RLock lock = redissonClient.getLock(locakKey);
+Boolean getLock = true;
+        //第一个try是尝试获取分布式锁
+  try {
+            //尝试获取锁的时间是30秒
+     getLock = lock.tryLock(30, TimeUnit.SECONDS);
+        } catch (Exception e) {
+            getLock = false;
+        }
+        //第二个try是如果获取到了分布式，应该执行的逻辑
+        try {
+            if (getLock) {
+                
+            } else {
+                log.error("单个用户多次秒杀，这次未获取锁，秒杀失败" + userId);
+              
+            }
+        } finally {
+            lock.unlock();
+       
+        }
+```
+
+## 5. 业务时间大于锁超时时间锁错误释放的问题
+
+这也是面试的时候经常会问的问题
+
+ 我们试想一个场景，当我们A线程加锁成功执行业务，但是由于业务时间大于锁超时时间，当锁超时之后B线程加锁成功开始执行业务，此时A线程业务执行结束，进行解锁操作。
+
+很多同学此时是没有考虑这种情况的，这种情况下就会造成B线程加的锁被A线程错位解掉，造成一种无锁的情况，另外的线程再竞争锁发现无锁又可以进行业务操作。
+
+ 这里我们主要提供几个思路。
+
+### 锁的时候判断是value是不是一样
+
+- 第一个思路就是在我们解锁时我们需要比对当前锁的内容是否属于当前线程锁加的锁，若是才进行解锁操作。
+
+这个也是我们在上面的代码用的，如下：
+
+```
+final String key = new StringBuffer().append(sid).append(userId).append("-RedisLock").toString();
+//主要是生成不重复的value，这里用随机数，但是还是建议用雪花id或者UUID
+final String value = RandomUtils.nextInt() + "";
+//如下：解锁的时候判断
+finally {  
+ if (value.equals(stringRedisTemplate.opsForValue().get(key))) {
+       stringRedisTemplate.delete(key);
+      }
+ }
+```
+
+###  lua脚本解决取完值刚好值过期的问题
+
+极限情况：如果当我们取完值的时候，value刚好失效怎么办，这个时候还没有进行equals比较
+
+这个时候同样会错误的把锁打开了，怎么办呢？
+
+还是LUA脚本，把取值和比较绑定到一起
+
+但是还是没有解决如果业务执行的时候大于锁的时间的问题，如果想要解决肯定是要给当前线程的锁延时的
+
+## 6.Lua脚本实现给当前线程过期时间延时操作
+
+
+
+ ### 在执行的逻辑中添加延时操作
+
+比如在我们具体的逻辑中，记录时间，如果快到了时间，进行延时操作，这个
+
+### 定时任务进行检测
+
+在续时锁的时候，我们需要检测当前锁需要续时的锁是否是当前线程锁占有，此时涉及取值和设时两个操作，考虑到之前的并发情况，我们仍然采用Lua脚本去实现续时。
+开启的守护线程执行频率需要控制，不可频繁执行造成资源浪费，我们这里以2/3过期时间周期去检测执行。
+当我们业务执行完成，该守护线程需要被销毁，不可无限制执行。
+
+```java
+   //开启守护线程 定期检测 续锁
+ ExpandLockExpireTask expandLockExpireTask = new ExpandLockExpireTask(lockName,currentValue,expire,this);
+ Thread thread = new Thread(expandLockExpireTask);
+ thread.setDaemon(true);
+ thread.start();
+ 
+```
+
+## 7. 可重入的redis分布式锁
+
+我们之前在考虑服务崩溃或者服务器宕机时，想到了锁会变成永久性质，造成死锁的情况以及如何去解决。
+
+这里我们再细想一下，如果我们A服务获取到锁并且设置成功失效时间，此时服务宕机，那么其他所有服务都需要等待一个周期之后才会有新的业务可以获取锁去执行。
+
+这里我们就要考虑一个可重入性，若我们当前A服务崩溃之后立刻恢复，那么我们是否需要允许该服务可以重新获取该锁权限，实现起来很简单，只需要在加锁失败之后验证当前锁内容是否和当前服务所匹配即可。
+
+## 8 redission实现可重入锁并解决超时延时
+
+![](.\img\redission1.jpg)
+
+
+
+
+
+### Redisson 可重入原理
+
+我们看下锁key存在的情况下，同一个机器同一个线程如何加锁的？
+
+```java
+"if (redis.call('hexists', KEYS[1], ARGV[2]) == 1) then " +
+  "redis.call('hincrby', KEYS[1], ARGV[2], 1); " +
+  "redis.call('pexpire', KEYS[1], ARGV[1]); " +
+  "return nil; " +
+"end; " +
+"return redis.call('pttl', KEYS[1]);",
+```
+
+`ARGV[2]` 是：“id + ":" + threadId”
+如果同一个机器同一个线程再次来请求，这里就会是1，然后执行`hincrby`， hset设置的value+1 变成了2，然后继续设置过期时间。
+
+同理，一个线程重入后，解锁时value - 1
+
+![](.\img\redission2.png)
+
+
+
+
+
+
+
+
+
+### redission互斥锁原理
+
+上诉的LUA脚本中有这个，这个命令啥意思呢？其实就是pttl key 查看给定键距离过期还有多少毫秒
+
+```java
+"return redis.call('pttl', KEYS[1]);",
+```
+
+其实就是加锁的时候判断PTTL是否为空，如果为空，说明加锁成功
+
+```java
+@Override
+public void lockInterruptibly(long leaseTime, TimeUnit unit) throws InterruptedException {
+    long threadId = Thread.currentThread().getId();
+    Long ttl = tryAcquire(leaseTime, unit, threadId);
+    // 返回ttl说明加锁成功，不为空则是加锁失败
+    if (ttl == null) {
+        return;
+    }
+
+    RFuture<RedissonLockEntry> future = subscribe(threadId);
+    commandExecutor.syncSubscription(future);
+
+    try {
+        // 死循环去尝试获取锁
+        while (true) {
+            // 再次尝试加锁
+            ttl = tryAcquire(leaseTime, unit, threadId);
+            // 如果ttl=null说明抢占锁成功
+            if (ttl == null) {
+                break;
+            }
+
+            // ttl 大于0，抢占锁失败，这个里面涉及到Semaphore，后续会讲解
+            if (ttl >= 0) {
+                getEntry(threadId).getLatch().tryAcquire(ttl, TimeUnit.MILLISECONDS);
+            } else {
+                getEntry(threadId).getLatch().acquire();
+            }
+        }
+    } finally {
+        unsubscribe(future, threadId);
+    }
+}
+```
+
+
+
+### Redisson watchDog原理
+
+如果一个场景：现在有A，B在执行业务，A加了分布式锁，但是生产环境是各种变化的，如果万一A锁超时了，但是A的业务还在跑。而这时由于A锁超时释放，B拿到锁，B执行业务逻辑。这样分布式锁就失去了意义？
+
+所以Redisson 引入了watch dog的概念，当A获取到锁执行后，如果锁没过期，有个后台线程会自动延长锁的过期时间，防止因为业务没有执行完而锁过期的情况。
+
+我们接着来看看具体实现：
+
+```java
+private <T> RFuture<Long> tryAcquireAsync(long leaseTime, TimeUnit unit, final long threadId) {
+    if (leaseTime != -1) {
+        return tryLockInnerAsync(leaseTime, unit, threadId, RedisCommands.EVAL_LONG);
+    }
+    RFuture<Long> ttlRemainingFuture = tryLockInnerAsync(commandExecutor.getConnectionManager().getCfg().getLockWatchdogTimeout(), TimeUnit.MILLISECONDS, threadId, RedisCommands.EVAL_LONG);
+    ttlRemainingFuture.addListener(new FutureListener<Long>() {
+        @Override
+        public void operationComplete(Future<Long> future) throws Exception {
+            if (!future.isSuccess()) {
+                return;
+            }
+
+            Long ttlRemaining = future.getNow();
+            // lock acquired
+            if (ttlRemaining == null) {
+                scheduleExpirationRenewal(threadId);
+            }
+        }
+    });
+    return ttlRemainingFuture;
+}
+```
+
+当我们`tryLockInnerAsync`执行完之后，会添加一个监听器，看看监听器中的具体实现：
+
+```java
+protected RFuture<Boolean> renewExpirationAsync(long threadId) {
+    return commandExecutor.evalWriteAsync(getName(), LongCodec.INSTANCE, RedisCommands.EVAL_BOOLEAN,
+            "if (redis.call('hexists', KEYS[1], ARGV[2]) == 1) then " +
+                "redis.call('pexpire', KEYS[1], ARGV[1]); " +
+                "return 1; " +
+            "end; " +
+            "return 0;",
+        Collections.<Object>singletonList(getName()), 
+        internalLockLeaseTime, getLockName(threadId));
+}
+```
+
+这里面调度任务每隔10s钟执行一次，lua脚本中是续约过期时间，使得当前线程持有的锁不会因为过期时间到了而失效
+
+### redission释放锁原理
+
+```java
+protected RFuture<Boolean> unlockInnerAsync(long threadId) {
+    return commandExecutor.evalWriteAsync(getName(), LongCodec.INSTANCE, RedisCommands.EVAL_BOOLEAN,
+        // 判断锁key值是否存在
+        "if (redis.call('exists', KEYS[1]) == 0) then " +
+            "redis.call('publish', KEYS[2], ARGV[1]); " +
+            "return 1; " +
+        "end;" +
+        // 判断当前机器、当前线程id对应的key是否存在
+        "if (redis.call('hexists', KEYS[1], ARGV[3]) == 0) then " +
+            "return nil;" +
+        "end; " +
+        // 计数器数量-1 可重入锁
+        "local counter = redis.call('hincrby', KEYS[1], ARGV[3], -1); " +
+        // 如果计数器大于0，说明还在持有锁
+        "if (counter > 0) then " +
+            "redis.call('pexpire', KEYS[1], ARGV[2]); " +
+            "return 0; " +
+        "else " +
+            // 使用del指令删除key
+            "redis.call('del', KEYS[1]); " +
+            "redis.call('publish', KEYS[2], ARGV[1]); " +
+            "return 1; "+
+        "end; " +
+        "return nil;",
+        Arrays.<Object>asList(getName(), getChannelName()), LockPubSub.unlockMessage, internalLockLeaseTime, getLockName(threadId));
+}
+```
+
+### 整个流程
+
+- 获取锁
+
+![](.\img\getLock.png)
+
+
+
+
+
+
+
+- 释放锁
+
+
+
+![](.\img\unLock.png)
+
+
+

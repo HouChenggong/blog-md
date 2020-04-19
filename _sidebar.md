@@ -13,7 +13,13 @@
 
 * springboot
 
-* mysql 
+* [mysql](./docs/mysql/mysql系列.md)
+
+* 
+
+* 分布式
+
+  - [redis层层深入剖析分布式锁](./docs/秒杀相关/分布式锁/1用redis实现分布式锁.md)
 
 * [算法汇总](./docs/算法总结.md)
 
