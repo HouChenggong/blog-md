@@ -4,7 +4,9 @@
 [CSDN](https://blog.csdn.net/qq_39455116)
 [GitHub](https://github.com/HouChenggong)
 [gitee](https://gitee.com/cnxiyou)
-[开始阅读](#希尤丨彦)
+[开始阅读](./docs/每日学习记录)
+
+
 
 
 
