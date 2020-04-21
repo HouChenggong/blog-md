@@ -26,4 +26,7 @@
 
 * [每日学习记录](./docs/每日学习记录.md)
 * [常用英文词汇](./docs/常用英文词汇.md)
-* 
+* 其它
+  - [一字型hash算法](./docs/其它/一致性hash算法.md)
+  - [easyExcel动态多表头](./docs/其它/easyExcel动态多表头.md)
+  - 

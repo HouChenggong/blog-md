@@ -132,7 +132,9 @@ monitor对象
 
 ![](monitor对象.svg)
 
+普通对象的话，markword8 classPoint4 padding4
 
+数组对象 markword 8 classPoint4  数组长度4 padding 0
 
 #### 2.2.1 JDK8markword实现表
 
@@ -267,6 +269,22 @@ markword中最低三位代表锁状态，第一位代表是否是偏向锁，2�
 
 因为stringbuffer的append()是synchronized的，但循环里面如果每次都加锁，就会加锁、释放锁一百次，所以JVM就会将加上锁的访问粗化到这一连串的操作，比如while循环，只要加一次锁即可
 
+- 锁粗化的模型
+
+```java
+for(int i=0;i<size;i++){
+    synchronized(lock){
+    }
+}
+```
+
+```java
+synchronized(lock){
+    for(int i=0;i<size;i++){
+    }
+}
+```
+
 
 
 #### 2.2.8 锁消除
@@ -286,5 +304,15 @@ sb.append(str1).append(str2);
 
 因为stringBuffer里面都是synchronied，所以里面的append就会消除锁
 
+- 锁消除模型
 
+```
+public void method(){
+    Object o=new Object();
+    sychronized (o){
+        //sout
+    }
+}
+```
 
+因为object对象O是内部的变量，所以根本不会存在竞争，所以代码直接没有锁，其实就是局部变量锁无效，只有成员变量锁有效
