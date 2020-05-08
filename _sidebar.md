@@ -4,7 +4,7 @@
 
   * [Java基础](./docs/java基础/java基础问题.md)
   * [Java常用的数据结构](./docs/java常用数据结构/collection.md)
-  * [jvm](./docs/b-4jvm.md)
+  * jvm
 * 计算机基础
 * 多线程
   - [Java写一个死锁](./docs/多线程/java写一个死锁.md)
