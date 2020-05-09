@@ -558,3 +558,181 @@ Object - 是所有类的根类，任何类的对象都可以设置给该Object�
 - NIO不阻塞io **(Non-blocking/New I/O)**
 - AIO异步IO **(Asynchronous I/O)**
 - 多路复用IO
+
+### 什么时候用抽象类
+
+与抽象类息息相关的还有一个概念，就是接口，我们留到下一篇文章中详细说，因为要说的知识点还是蛮多的。你现在只需要有这样一个概念就好，接口是对行为的抽象，抽象类是对整个类（包含成员变量和行为）进行抽象。
+
+所以抽象类有什么特性：
+
+```java
+1.定义抽象类的时候需要用到关键字 abstract，放在 class 关键字前。
+2.抽象类不能被实例化，但可以有子类。
+3.如果一个类定义了一个或多个抽象方法，那么这个类必须是抽象类。
+4.抽象类可以同时声明抽象方法和具体方法，也可以什么方法都没有，但没必要
+5.抽象类派生的子类必须实现父类中定义的抽象方法
+```
+
+- 什么时候用抽象类
+  - 一、我们希望一些通用的功能被多个子类复用。比如说，AbstractPlayer 抽象类中有一个普通的方法 `sleep()`，表明所有运动员都需要休息，那么这个方法就可以被子类复用。
+
+```java
+public abstract class AbstractPlayer {
+    public void sleep() {
+        System.out.println("运动员也要休息而不是挑战极限");
+    }
+}
+```
+
+- 具体示例
+
+为了进一步展示抽象类的特性，我们再来看一个具体的示例。假设现在有一个文件，里面的内容非常简单——“Hello World”，现在需要有一个读取器将内容读取出来，最好能按照大写的方式，或者小写的方式。
+
+这时候，最好定义一个抽象类，比如说 BaseFileReader：
+
+```java
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.List;
+import java.util.stream.Collectors;
+
+/**
+ * @author xiyou
+ * @version 1.0
+ * xiyou-todo 用抽象类实现大小写读取的方法
+ * @date 2020/5/9 9:34
+ */
+public abstract class BaseFileReader {
+    //filePath 为文件路径，使用 protected 修饰，表明该成员变量可以在需要时被子类访问。
+    protected Path filePath;
+
+    /**
+     * 构造函数
+     *
+     * @param filePath
+     */
+    protected BaseFileReader(Path filePath) {
+        this.filePath = filePath;
+    }
+
+    /**
+     * readFile() 方法用来读取文件，方法体里面调用了抽象方法 mapFileLine()——需要子类扩展实现大小写的方式。
+     *
+     * @return
+     * @throws IOException
+     */
+    public List<String> readFile() throws IOException {
+        return Files.lines(filePath)
+                .map(this::mapFileLine).collect(Collectors.toList());
+    }
+
+    /**
+     * 需要字类扩展的方法
+     *
+     * @param line
+     * @return
+     */
+    protected abstract String mapFileLine(String line);
+}
+```
+
+小写的实现
+
+```java
+import java.nio.file.Path;
+
+/**
+ * @author xiyou
+ * @version 1.0
+ * xiyou-todo 小写的实现
+ * @date 2020/5/9 9:35
+ */
+public class LowercaseFileReader extends BaseFileReader {
+    /**
+     * 读取父类的PATH
+     * @param filePath
+     */
+    protected LowercaseFileReader(Path filePath) {
+        super(filePath);
+    }
+
+    /**
+     * 小写实现
+     *
+     * @param line
+     * @return
+     */
+    @Override
+    protected String mapFileLine(String line) {
+        return line.toLowerCase();
+    }
+}
+```
+
+大写的实现
+
+```java
+public class UppercaseFileReader extends BaseFileReader {
+    /**
+     * 读取父类PATH
+     * @param filePath
+     */
+    protected UppercaseFileReader(Path filePath) {
+        super(filePath);
+    }
+
+    /**
+     * 大写的实现
+     * @param line
+     * @return
+     */
+    @Override
+    protected String mapFileLine(String line) {
+        return line.toUpperCase();
+    }
+}
+```
+
+测试，在项目的 resource 目录下有一个文本文件，名字叫 helloworld.txt。里面写入
+
+```java
+[hello world]
+[HELLO WORLD]
+```
+
+
+
+```java
+    public static void main(String[] args) throws URISyntaxException, IOException {
+        URL location = TestAbstractReader.class.getClassLoader().getResource("helloworld.txt");
+        Path path = Paths.get(location.toURI());
+        BaseFileReader lowercaseFileReader = new LowercaseFileReader(path);
+        BaseFileReader uppercaseFileReader = new UppercaseFileReader(path);
+        System.out.println(lowercaseFileReader.readFile());
+        System.out.println(uppercaseFileReader.readFile());
+    }
+//结果：
+[[hello world], [hello world]]
+[[HELLO WORLD], [HELLO WORLD]]
+```
+
+### 接口和抽象类的区别是什么
+
+1. 接口的方法默认是 public，所有方法在接口中不能有实现(Java 8 开始接口方法可以有默认实现），而抽象类可以有非抽象的方法。
+2. 接口中除了 static、final 变量，不能有其他变量，而抽象类中则不一定。
+3. 一个类可以实现多个接口，但只能实现一个抽象类。接口自己本身可以通过 extends 关键字扩展多个接口。
+4. 接口方法默认修饰符是 public，抽象方法可以有 public、protected 和 default 这些修饰符（抽象方法就是为了被重写所以不能使用 private 关键字修饰！）。
+5. 从设计层面来说，抽象是对类的抽象，是一种模板设计，而接口是对行为的抽象，是一种行为的规范。
+
+> 备注：
+>
+> 1. 在 JDK8 中，接口也可以定义静态方法，可以直接用接口名调用。实现类和实现是不可以调用的。如果同时实现两个接口，接口中定义了一样的默认方法，则必须重写，不然会报错。(详见 issue:https://github.com/Snailclimb/JavaGuide/issues/146。
+> 2. jdk9 的接口被允许定义私有方法 。
+
+总结一下 jdk7~jdk9 Java 中接口概念的变化（[相关阅读](https://www.geeksforgeeks.org/private-methods-java-9-interfaces/)）：
+
+1. 在 jdk 7 或更早版本中，接口里面只能有常量变量和抽象方法。这些接口方法必须由选择实现接口的类实现。
+2. jdk8 的时候接口可以有默认方法和静态方法功能。
+3. Jdk 9 在接口中引入了私有方法和私有静态方法。
