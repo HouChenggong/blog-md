@@ -11,7 +11,7 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @Data
 public class TreeNode {
-    public Integer val;
+    public int val;
 
     public TreeNode left;
 

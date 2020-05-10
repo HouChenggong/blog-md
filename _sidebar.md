@@ -1,11 +1,18 @@
 
 * [写在前面](./README.md)
+
 * Java
 
   * [Java基础](./docs/java基础/java基础问题.md)
   * [Java常用的数据结构](./docs/java常用数据结构/collection.md)
   * jvm
-* 计算机基础
+  
+* 设计模型
+
+  - [工厂模式和抽象工厂模式](./docs/设计模式/工厂模式和抽象工厂模式.md)
+
+    
+
 * 多线程
   - [Java写一个死锁](./docs/多线程/java写一个死锁.md)
   - 

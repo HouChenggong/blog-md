@@ -66,18 +66,49 @@ public @interface Service {}
 
 @Primary作用是如果发现有多个同样类型的bean时，优先选择哪个
 
-## bean 生命周期
+### IOC初始化
+
+#### ioc初始化过程
 
 1. 通过我们的配置@ComponentScan定义去扫描带有@Component的类
 2. 找到这些类之后，开始解析，并且把定义的信息保存起来，但是没有进行bean初始化，也没有bean的实例，仅仅是bean的定义
 
 将所有的 Bean 定义保存到 BeanDefinition 的实例中 
 
+```java
+definition
+英 [ˌdefɪˈnɪʃn]   美 [ˌdefɪˈnɪʃn]  
+n.
+(尤指词典里的词或短语的)释义，解释;定义;清晰度
+```
+
 1. 发布bean到IOC容器中，此时IOC里面也仅仅只有Bean的定义，还是没有bean的实例
 2. 实例化，创建bean的实例对象
 3. 依赖注入DI（例如@Autowired）
 
 
+
+#### DI依赖注入流程? （实例化，处理Bean之间的依赖关系）
+
+过程在Ioc初始化后，依赖注入的过程是用户第一次向IoC容器索要Bean时触发
+
+- 如果设置lazy-init=true，会在第一次getBean的时候才初始化bean， lazy-init=false，会容器启动的时候直接初始化（singleton bean）；
+- 调用BeanFactory.getBean（）生成bean的；
+- 生成bean过程运用装饰器模式产生的bean都是beanWrapper（bean的增强）
+
+#### 依赖注入怎么处理bean之间的依赖关系?
+
+### Bean的生命周期?
+
+- 实例化Bean：Ioc容器通过获取BeanDefinition对象中的信息进行实例化，实例化对象被包装在BeanWrapper对象中
+- 设置对象属性（DI）：通过BeanWrapper提供的设置属性的接口完成属性依赖注入；
+- 注入Aware接口（BeanFactoryAware， 可以用这个方式来获取其它 Bean，ApplicationContextAware）：Spring会检测该对象是否实现了xxxAware接口，并将相关的xxxAware实例注入给bean
+- BeanPostProcessor：自定义的处理（分前置处理和后置处理）
+- InitializingBean和init-method：执行我们自己定义的初始化方法
+- 使用
+- destroy：bean的销毁
+
+其实就是通过在beanDefinition载入时，如果bean有依赖关系，通过占位符来代替，在调用getbean时候，如果遇到占位符，从ioc里获取bean注入到本实例来
 
 ## Spring的IOC注入方式
 
@@ -162,9 +193,9 @@ class Solution {
 
 #### 解决相互依赖问题具体流程是什么？
 
-要说明流程光靠上面3个Map是不够的，还要引入一个ingletonsCurrentlyInCreation
+要说明流程光靠上面3个Map是不够的，还要引入一个singletonsCurrentlyInCreation
 
-ingletonsCurrentlyInCreation：创建中池，保存处于创建中的单例bean的BeanName，是Set，在这个bean实例开始创建时添加到池中，而来Bean实例创建完成之后从池中移除。
+singletonsCurrentlyInCreation：创建中池，保存处于创建中的单例bean的BeanName，是Set，在这个bean实例开始创建时添加到池中，而来Bean实例创建完成之后从池中移除。
 
 流程开始：当存在循环依赖的情况时，比如之前的情况：A依赖B，B又依赖A的情况，这种情况下
 
@@ -198,7 +229,7 @@ ingletonsCurrentlyInCreation：创建中池，保存处于创建中的单例bean
 2. 如果获取不到或者对象正在创建中（isSingletonCurrentlyInCreation()），那就再从二级缓存earlySingletonObjects中获取。（如果获取到就直接return）
 3. 如果还是获取不到，且允许singletonFactories（allowEarlyReference=true）通过getObject()获取。就从三级缓存singletonFactory.getObject()获取。（如果获取到了就从singletonFactories中移除，并且放进earlySingletonObjects。
 4. 其实也就是从三级缓存移动（是剪切、不是复制哦~）到了二级缓存）
-    
+   
 
 #### 为啥构造器造成的循环依赖spring无法解决？
 
