@@ -7,9 +7,9 @@ import java.util.concurrent.Executors;
 
 public class CyclicBarrierExample3 {
     // 请求的数量
-    private static final int threadCount = 550;
+    private static final int threadCount = 9;
     // 需要同步的线程数量
-    private static final CyclicBarrier cyclicBarrier = new CyclicBarrier(5, () -> {
+    private static final CyclicBarrier cyclicBarrier = new CyclicBarrier(3, () -> {
         System.out.println("------当线程数达到之后，优先执行------");
     });
 

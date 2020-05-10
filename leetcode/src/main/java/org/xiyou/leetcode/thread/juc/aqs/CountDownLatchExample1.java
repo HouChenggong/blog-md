@@ -6,11 +6,11 @@ import java.util.concurrent.Executors;
 
 public class CountDownLatchExample1 {
     // 请求的数量
-    private static final int threadCount = 550;
+    private static final int threadCount = 30;
 
     public static void main(String[] args) throws InterruptedException {
         // 创建一个具有固定线程数量的线程池对象（如果这里线程池的线程数量给太少的话你会发现执行的很慢）
-        ExecutorService threadPool = Executors.newFixedThreadPool(300);
+        ExecutorService threadPool = Executors.newFixedThreadPool(50);
         final CountDownLatch countDownLatch = new CountDownLatch(threadCount);
         for (int i = 0; i < threadCount; i++) {
             final int threadnum = i;
@@ -32,8 +32,8 @@ public class CountDownLatchExample1 {
     }
 
     public static void test(int threadnum) throws InterruptedException {
-        Thread.sleep(1000);// 模拟请求的耗时操作
+        Thread.sleep(2000);// 模拟请求的耗时操作
         System.out.println("threadnum:" + threadnum);
-        Thread.sleep(1000);// 模拟请求的耗时操作
+        Thread.sleep(2000);// 模拟请求的耗时操作
     }
 }

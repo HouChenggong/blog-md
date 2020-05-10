@@ -4,18 +4,24 @@
 * Java
 
   * [Java基础](./docs/java基础/java基础问题.md)
+  
   * [Java常用的数据结构](./docs/java常用数据结构/collection.md)
-  * jvm
+  
+  * [各种树的比较和应用](./docs/java常用数据结构/树.md)
+  
+    
   
 * 设计模型
 
   - [工厂模式和抽象工厂模式](./docs/设计模式/工厂模式和抽象工厂模式.md)
 
+  - [框架中用的设计模式](./docs/设计模式/框架中的设计模式.md)
+
     
 
 * 多线程
   - [Java写一个死锁](./docs/多线程/java写一个死锁.md)
-  - 
+  - [AQS和JUC](./docs/多线程/AQS.md)
 
 
 * spring

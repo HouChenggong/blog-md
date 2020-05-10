@@ -6,6 +6,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 public class TestThread {
     public static void main(String[] args) {
+        Thread thread;
+
         AtomicInteger integer;
         Executors es;
         ThreadPoolExecutor executor;

@@ -6,13 +6,13 @@ import java.util.concurrent.Semaphore;
 
 public class SemaphoreExample1 {
     // 请求的数量
-    private static final int threadCount = 550;
+    private static final int threadCount = 20;
 
     public static void main(String[] args) throws InterruptedException {
         // 创建一个具有固定线程数量的线程池对象（如果这里线程池的线程数量给太少的话你会发现执行的很慢）
-        ExecutorService threadPool = Executors.newFixedThreadPool(300);
+        ExecutorService threadPool = Executors.newFixedThreadPool(30);
         // 一次只能允许执行的线程数量。
-        final Semaphore semaphore = new Semaphore(20);
+        final Semaphore semaphore = new Semaphore(5);
 
         for (int i = 0; i < threadCount; i++) {
             final int threadnum = i;
@@ -33,8 +33,8 @@ public class SemaphoreExample1 {
     }
 
     public static void test(int threadnum) throws InterruptedException {
-        Thread.sleep(1000);// 模拟请求的耗时操作
+        Thread.sleep(2000);// 模拟请求的耗时操作
         System.out.println("threadnum:" + threadnum);
-        Thread.sleep(1000);// 模拟请求的耗时操作
+        Thread.sleep(2000);// 模拟请求的耗时操作
     }
 }
