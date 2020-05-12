@@ -1,4 +1,4 @@
-### 继承封装和多态
+## 继承封装和多态
 
 在 Java 中有两种形式可以实现多态：继承（多个子类对同一方法的重写）和接口（实现接口并覆盖接口中同一方法）。
 
@@ -834,7 +834,7 @@ public abstract class Enum<E extends Enum<E>>
 
 另外，**通过把clone、readObject、writeObject这三个方法定义为final，保证了每个枚举类型及枚举常量都是不可变的**，也就是说，可以用枚举实现线程安全的单例。
 
-#### 在Java的反射中，Class.forName和ClassLoader的区别
+###  在Java的反射中，Class.forName和ClassLoader的区别
 
 **[传送门](https://www.cnblogs.com/jimoer/p/9185662.html)**
 
