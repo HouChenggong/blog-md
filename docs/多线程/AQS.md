@@ -4,6 +4,12 @@
 package java.util.concurrent;包下面的
 ```
 
+![](./img/juc的实现.png)
+
+
+
+
+
 ### Exchanger
 
 package java.util.concurrent;包下面的Exchanger
@@ -67,9 +73,9 @@ public class T12_TestExchanger {
 }
 ```
 
-# 
+## AQS同步器
 
-## AQS
+**[一篇介绍的AQS的博文](https://www.jianshu.com/p/a8d27ba5db49)**
 
 ```java
 package java.util.concurrent.locks;包下面的AQS：AbstractQuenedSynchronizer
@@ -78,7 +84,9 @@ package java.util.concurrent.locks;包下面的AQS：AbstractQuenedSynchronizer
 AQS：AbstractQuenedSynchronizer抽象的队列式同步器。是除了java自带的synchronized关键字之外的锁机制。
 AQS的全称为（AbstractQueuedSynchronizer），这个类在java.util.concurrent.locks包
 
-**AQS的核心思想** ：
+### 1.AQS的核心思想
+
+  AQS的核心思想是基于volatile int state这样的volatile变量，配合Unsafe工具对其原子性的操作来实现对当前锁状态进行修改。同步器内部依赖一个FIFO的双向队列来完成资源获取线程的排队工作。
 
 用volatile修饰一个共享变量，线程通过CAS取改变，成功获取锁，失败进入等待队列，等待被唤醒，所以AQS是自旋锁
 
@@ -86,6 +94,61 @@ J.U.C是基于AQS实现的，AQS是一个同步器，设计模式是模板模式
 核心数据结构：双向链表 + state(锁状态)
 
 底层是CAS
+
+### 2.AQS同步器的应用
+
+　同步器主要使用方式是继承，子类通过继承同步器并实现它的抽象方法来管理同步状态，对同步状态的修改或者访问主要通过同步器提供的3个方法：
+
+- getState() 获取当前的同步状态
+
+- setState(int newState) 设置当前同步状态
+
+- compareAndSetState(int expect,int update) 使用CAS设置当前状态，该方法能够保证状态设置的原子性。
+
+   同步器可以支持独占式的获取同步状态，也可以支持共享式的获取同步状态，这样可以方便实现不同类型的同步组件。
+
+### 3.AQS同步队列
+
+  ![](./img/AQS队列.png)
+
+
+
+
+
+
+
+ 同步器AQS内部的实现是依赖同步队列（一个FIFO的双向队列，其实就是数据结构双向链表）来完成同步状态的管理。
+
+  当前线程获取同步状态失败时，同步器AQS会将**当前线程和等待状态**等信息构造成为一个节点（node）加入到同步队列，同时会阻塞当前线程；
+
+  当同步状态释放的时候，会把首节点中的线程唤醒，使首节点的线程再次尝试获取同步状态。
+
+**AQS是独占锁和共享锁的实现的父类。**
+
+### 4. AQS锁类别：独占锁和共享锁。
+
+AQS已经为我们提供了同步器的基础操作，如果要自定义同步器，必须实现以下几个方法：
+
+- `tryAcquire(int)`：独占方式。尝试获取资源，成功则返回true，失败则返回false。
+- `tryRelease(int)`：独占方式。尝试释放资源，成功则返回true，失败则返回false。
+- `tryAcquireShared(int)`：共享方式。尝试获取资源。负数表示失败；0表示成功，但没有剩余可用资源；正数表示成功，且有剩余资源。
+- `tryReleaseShared(int)`：共享方式。尝试释放资源，成功则返回true，失败则返回false。
+- `isHeldExclusively()`：该线程是否正在独占资源。只有用到Condition才需要去实现它。
+
+---
+
+
+
+- 独占锁：锁在一个时间点只能被一个线程占有。根据锁的获取机制，又分为“公平锁”和“非公平锁”。**等待队列**中按照FIFO的原则获取锁，等待时间越长的线程越先获取到锁，这就是公平的获取锁，即公平锁。而非公平锁，线程获取的锁的时候，无视**等待队列**直接获取锁。ReentrantLock和ReentrantReadWriteLock.Writelock是独占锁。
+  - **说明：**独占模式下获取资源/锁，忽略中断的影响。内部主要调用了三个方法，其中tryAcquire需要自定义实现。后面会对各个方法进行详细分析。`acquire`方法流程如下：
+    1. `tryAcquire()` 尝试直接获取资源，如果成功则直接返回，失败进入第二步；
+    2. `addWaiter()` 获取资源失败后，将当前线程加入等待队列的尾部，并标记为独占模式；
+    3. `acquireQueued()` 使线程在等待队列中自旋等待获取资源，一直获取到资源后才返回。如果在等待过程中被中断过，则返回true，否则返回false。
+    4. 如果线程在等待过程中被中断(interrupt)是不响应的，在获取资源成功之后根据返回的中断状态调用`selfInterrupt()`方法再把中断状态补上。
+- 共享锁：同一个时候能够被多个线程获取的锁，能被共享的锁。JUC包中ReentrantReadWriteLock.ReadLock，CyclicBarrier，CountDownLatch和Semaphore都是共享锁。
+  - 在`tryAcquireShared`中获取资源失败后，将当前线程加入等待队列尾部等待唤醒，成功获取资源后返回。在阻塞结束后成功获取到资源时，如果还有剩余资源，就调用`setHeadAndPropagate`方法继续唤醒之后的线程
+
+ 
 
 **实现了AQS的锁有：自旋锁、互斥锁、读锁写锁、条件产量、信号量、栅栏都是AQS的衍生物**
 
@@ -96,6 +159,7 @@ AQS 定义了两种资源共享方式：
 2.**Share**：共享，多个线程可以同时执行，如Semaphore、CountDownLatch、ReadWriteLock，CyclicBarrier
 
 **AQS底层使用了模板方法模式**
+## AQS的应用
 
 ### Semaphore信号量
 
