@@ -736,3 +736,100 @@ public class UppercaseFileReader extends BaseFileReader {
 1. 在 jdk 7 或更早版本中，接口里面只能有常量变量和抽象方法。这些接口方法必须由选择实现接口的类实现。
 2. jdk8 的时候接口可以有默认方法和静态方法功能。
 3. Jdk 9 在接口中引入了私有方法和私有静态方法。
+
+### 枚举为啥线程安全而且序列化、反射安全都是单例
+
+- 随便写个枚举
+
+```java
+public enum  AppleEnum {
+    RED,BLEACK,WHITE;
+}
+```
+
+- Javac生成class文件
+
+```java
+package org.xiyou.leetcode.thread;
+
+public enum AppleEnum {
+    RED,
+    BLEACK,
+    WHITE;
+    private AppleEnum() {
+    }
+}
+```
+
+- javap 反编译class文件
+
+发现下面生成的都是static final修饰的
+
+```java
+
+public final class  AppleEnum extends 
+    java.lang.Enum<AppleEnum> {
+  public static final  AppleEnum RED;
+  public static final  AppleEnum BLEACK;
+  public static final  AppleEnum WHITE;
+  public static  AppleEnum[] values();
+  public static  AppleEnum valueOf(java.lang.String);
+  static {};
+}
+
+```
+
+- 看枚举父类
+
+```java
+public abstract class Enum<E extends Enum<E>>
+        implements Comparable<E>, Serializable {
+
+    private final String name;
+
+    public final String name() {
+        return name;
+    }
+
+    private final int ordinal;
+
+    public final int ordinal() {
+        return ordinal;
+    }
+
+    protected Enum(String name, int ordinal) {
+        this.name = name;
+        this.ordinal = ordinal;
+    }
+    ......
+   public final int compareTo(E o) {
+        Enum<?> other = (Enum<?>)o;
+        Enum<E> self = this;
+        if (self.getClass() != other.getClass() && // optimization
+            self.getDeclaringClass() != other.getDeclaringClass())
+            throw new ClassCastException();
+        return self.ordinal - other.ordinal;
+    }
+    protected final Object clone() throws CloneNotSupportedException {
+        throw new CloneNotSupportedException();
+    }
+   private void readObject(ObjectInputStream in) throws IOException,
+        ClassNotFoundException {
+        throw new InvalidObjectException("can't deserialize enum");
+    }
+
+    private void readObjectNoData() throws ObjectStreamException {
+        throw new InvalidObjectException("can't deserialize enum");
+    }
+}
+```
+
+从Enum中我们可以看到，每个枚举都定义了两个属性，name和ordinal，name表示枚举变量的名称，而ordinal则是根据变量定义的顺序授予的整型值，从0开始。
+
+而且我们可以从Enum的源码中看到，大部分的方法都是final修饰的，特别是**clone、readObject、writeObject**这三个方法，**保证了枚举类型的不可变性**，不能通过克隆、序列化和反序列化复制枚举，这就保证了枚举变量只是一个实例，即是单例的。
+
+总结一下，其实**枚举本质上也是通过普通的类来实现的**，只是编译器为我们进行了处理。每个枚举类型都继承自**Enum**类，并由**编译器自动添加了values()和valueOf()方法**，**每个枚举变量是一个静态常量字段，由内部类实现**，而这个内部类继承了此枚举类。
+
+**所有的枚举变量都是通过静态代码块进行初始化**，也就是说在类加载期间就实现了。
+
+另外，**通过把clone、readObject、writeObject这三个方法定义为final，保证了每个枚举类型及枚举常量都是不可变的**，也就是说，可以用枚举实现线程安全的单例。

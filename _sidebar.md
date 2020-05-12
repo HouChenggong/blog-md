@@ -44,4 +44,6 @@
 * 其它
   - [一字型hash算法](./docs/其它/一致性hash算法.md)
   - [easyExcel动态多表头](./docs/其它/easyExcel动态多表头.md)
+  - [推荐的idea插件](./docs/其它/推荐插件.md)
   - 
+
