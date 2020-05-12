@@ -833,3 +833,78 @@ public abstract class Enum<E extends Enum<E>>
 **所有的枚举变量都是通过静态代码块进行初始化**，也就是说在类加载期间就实现了。
 
 另外，**通过把clone、readObject、writeObject这三个方法定义为final，保证了每个枚举类型及枚举常量都是不可变的**，也就是说，可以用枚举实现线程安全的单例。
+
+#### 在Java的反射中，Class.forName和ClassLoader的区别
+
+**[传送门](https://www.cnblogs.com/jimoer/p/9185662.html)**
+
+在java中Class.forName()和ClassLoader都可以对类进行加载。ClassLoader就是遵循**双亲委派模型**最终调用启动类加载器的类加载器，实现的功能是“通过一个类的全限定名来获取描述此类的二进制字节流”，获取到二进制流后放到JVM中。Class.forName()方法实际上也是调用的CLassLoader来实现的。
+
+```java
+  @CallerSensitive
+    public static Class<?> forName(String className)
+                throws ClassNotFoundException {
+        Class<?> caller = Reflection.getCallerClass();
+        return forName0(className, true, ClassLoader.getClassLoader(caller), caller);
+    }
+```
+
+最后调用的方法是forName0这个方法，在这个forName0方法中的第二个参数被默认设置为了true，这个参数代表是否对加载的类进行初始化，设置为true时会类进行初始化，代表会执行类中的静态代码块，以及对静态变量的赋值等操作。
+
+也可以调用Class.forName(String name, boolean initialize,ClassLoader loader)方法来手动选择在加载类的时候是否要对类进行初始化。
+
+```java
+public class ClassForName {
+    //静态代码块
+    static {
+        System.out.println("执行了静态代码块");
+    }
+
+    //静态变量
+    private static String staticFiled = staticMethod();
+
+    //赋值静态变量的静态方法
+    public static String staticMethod() {
+        System.out.println("执行了静态方法");
+        return "给静态字段赋值了";
+    }
+}
+```
+
+- classForName
+
+```java
+    public static void test45(){
+        try {
+            Class.forName("org.xiyou.leetcode.javabase.ClassForName");
+            System.out.println("#########-------------结束符------------##########");
+        } catch (ClassNotFoundException e) {
+            e.printStackTrace();
+        }
+    }
+    //结果如下：
+执行了静态代码块
+执行了静态方法
+#########-------------结束符------------##########
+```
+
+- classLocader
+
+```java
+public static void test44(){
+        try {
+            ClassLoader.getSystemClassLoader().loadClass("org.xiyou.leetcode.javabase.ClassForName");
+            System.out.println("#########-------------结束符------------##########");
+        } catch (ClassNotFoundException e) {
+            e.printStackTrace();
+        }
+    }
+//结果如下
+#########-------------结束符------------##########
+```
+
+- 根据运行结果得出Class.forName加载类时将类进了初始化，而ClassLoader的loadClass并没有对类进行初始化，只是把类加载到了虚拟机中。
+
+在我们熟悉的Spring框架中的IOC的实现就是使用的ClassLoader。
+
+而在我们使用JDBC时通常是使用Class.forName()方法来加载数据库连接驱动。这是因为在JDBC规范中明确要求Driver(数据库驱动)类必须向DriverManager注册自己。
