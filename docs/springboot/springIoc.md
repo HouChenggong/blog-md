@@ -2,6 +2,65 @@
 
 inversion of control  控制反转
 
+例如：现有类 A 依赖于类 B
+
+- **传统的开发方式** ：往往是在类 A 中手动通过 new 关键字来 new 一个 B 的对象出来
+- **使用 IoC 思想的开发方式** ：不通过 new 关键字来创建对象，而是通过 IoC 容器(Spring 框架) 来帮助我们实例化对象。我们需要哪个对象，直接从 IoC 容器里面过去即可。
+
+从以上两种开发方式的对比来看：我们 “丧失了一个权力” (创建、管理对象的权力)，从而也得到了一个好处（不用再考虑对象的创建、管理等一系列的事情）
+
+### 为什么叫控制反转
+
+**控制** ：指的是对象创建（实例化、管理）的权力
+
+**反转** ：控制权交给外部环境（Spring 框架、IoC 容器）
+
+### IoC 解决了什么问题
+
+IoC 的思想就是两方之间不互相依赖，由第三方容器来管理相关资源。这样有什么好处呢？
+
+1. 对象之间的耦合度或者说依赖程度降低；
+2. 资源变的容易管理；比如你用 Spring 容器提供的话很容易就可以实现一个单例。
+
+例如：现有一个针对 User 的操作，利用 Service 和 Dao 两层结构进行开发
+
+在没有使用 IoC 思想的情况下，Service 层想要使用 Dao 层的具体实现的话，需要通过 new 关键字在`UserServiceImpl` 中手动 new 出 `IUserDao` 的具体实现类 `UserDaoImpl`（不能直接 new 接口类）。
+
+很完美，这种方式也是可以实现的，但是我们想象一下如下场景：
+
+开发过程中突然接到一个新的需求，针对对`IUserDao` 接口开发出另一个具体实现类。就是多个一个UserDao的实现类比如UserDaoTwoImpl。因为 Server 层依赖了`IUserDao`的具体实现，所以我们需要修改`UserServiceImpl`中 new 的对象。如果只有一个类引用了`IUserDao`的具体实现，可能觉得还好，修改起来也不是很费力气，但是如果有许许多多的地方都引用了`IUserDao`的具体实现的话，一旦需要更换`IUserDao` 的实现方式，那修改起来将会非常的头疼。
+
+使用 IoC 的思想，我们将对象的控制权（创建、管理）交有 IoC 容器去管理，我们在使用的时候直接向 IoC 容器 “要” 就可以了
+
+比如
+
+```java
+@Service
+public class UserDaoTwoImpl implements UserDao {
+```
+
+```java
+@Service
+public class UserDaoImpl implements UserDao {
+```
+
+当你把你的UserDao注入到service的时候，其实idea会报错，会给你提示
+
+```java
+    @Autowired
+    private UserDao userDao;
+```
+
+然后变成下面这样就可以了
+
+```java
+    @Qualifier("userDaoImpl")
+    @Autowired
+    private UserDao userDao;
+```
+
+
+
 ## 1. 依赖倒置思想
 
 ### 牵一发而动全身的设计
@@ -15,6 +74,10 @@ inversion of control  控制反转
 上面的思路不行，所以我们反过来，先设计车，再设计地盘，再根据车地盘设计轮子，再根据轮子设计螺丝，这样如果我们要改车的轮子了，我们只需要动车的轮子，而不需要动车地盘
 
 **高层建筑决定需要什么，底层去实现这样的需求，但是高层并不用管底层是怎么实现的。**这样就不会出现前面的“牵一发动全身”的情况。
+
+
+
+
 
 ## 2. 控制反转实现是依赖注入DI
 

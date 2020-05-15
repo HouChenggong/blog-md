@@ -2,6 +2,8 @@
 
 最常用的场景就是为了保证线程可见性而使用volatile
 
+**[一个介绍volatile的地址](https://mp.weixin.qq.com/s/R1D5tfuMVL-v8qQlZvPhmA)**
+
 **什么是共享变量的可见性？**
 
 多线程并发编程中主要围绕着三个特性实现。可见性是其中一种！
@@ -234,6 +236,8 @@ CPU使用到某块内存区域数据，这块内存区域后面临近的数据�
 第二：后来搞出来了：缓存一致性协议。缓存一致性协议主要规范了CPU 读写主存、管理缓存数据的一系列规范。协议的类型很多（MSI、MESI、MOSI、Synapse、Firefly），最常见的就是Intel 的MESI 协议
 
 MESI 协议的核心思想：
+
+M：modifiled已修改  E：Exclusive独享  S：共享shared  I  Invalid无效的
 
 - 定义了缓存中的数据状态只有四种，MESI 是四种状态的首字母。
 - 当CPU写数据时，如果写的变量是共享变量，即在其他CPU中也存在该变量的副本，会发出信号通知其他CPU将该变量的缓存行置为无效状态；
