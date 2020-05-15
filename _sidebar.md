@@ -17,11 +17,16 @@
 
   - [框架中用的设计模式](./docs/设计模式/框架中的设计模式.md)
 
+  - [模板模式](./docs/设计模式/模板模式.md)
+
+  - 
+
     
 
 * 多线程
   - [Java写一个死锁](./docs/多线程/java写一个死锁.md)
   - [AQS和JUC](./docs/多线程/AQS.md)
+  - [volatile](./docs/多线程/volatile和Happens-Before原则.md)
 
 
 * spring

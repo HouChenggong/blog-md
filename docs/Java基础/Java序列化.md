@@ -95,3 +95,14 @@ public class SerializeNY {
 
 ## 序列化如何破坏单例，以及如何阻止序列化破坏单例
 请查看多线程里面的单例模式，有具体介绍
+
+单例模式重写readResolve方法
+
+```java
+private Object readResolve() {
+    return singleton;
+}
+```
+序列化会通过反射调用无参数的构造方法创建一个新的对象。
+
+但是为啥用了readResolve方法就能是单例了，因为在创建的时候，序列化方法做了一层判断，回去判断是否是readResolve，也就是生成策略会发生变化

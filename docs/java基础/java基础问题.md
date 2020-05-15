@@ -575,6 +575,8 @@ Object - 是所有类的根类，任何类的对象都可以设置给该Object�
 
 - 什么时候用抽象类
   - 一、我们希望一些通用的功能被多个子类复用。比如说，AbstractPlayer 抽象类中有一个普通的方法 `sleep()`，表明所有运动员都需要休息，那么这个方法就可以被子类复用。
+  - 我们需要在抽象类中定义好 API，然后在子类中扩展实现。比如说，AbstractPlayer  抽象类中有一个抽象方法 `play()`，定义所有运动员都可以从事某项运动，但需要对应子类去扩展实现。
+  - 如果父类与子类之间的关系符合 `is-a` 的层次关系，就可以使用抽象类，比如说篮球运动员是运动员，足球运动员是运动员。
 
 ```java
 public abstract class AbstractPlayer {
@@ -717,6 +719,72 @@ public class UppercaseFileReader extends BaseFileReader {
 [[hello world], [hello world]]
 [[HELLO WORLD], [HELLO WORLD]]
 ```
+
+### 接口是什么
+
+ Java 中，可以通过两种形式来达到抽象的目的，一种是抽象类，另外一种就是接口。
+
+一个简单的区别是：一个类只能继承一个抽象类，但却可以实现多个接口。
+
+```java
+public interface Electronic {
+    // 常量
+    String LED = "LED";
+
+    // 抽象方法
+    int getElectricityUse();
+
+    // 静态方法
+    static boolean isEnergyEfficient(String electtronicType) {
+        return electtronicType.equals(LED);
+    }
+
+    // 默认方法
+    default void printDescription() {
+        System.out.println("电子");
+    }
+}
+```
+
+上面接口的实现类，我们发现三个二方法我们只需要实现一个即可
+
+```java
+@Service
+public class IElectronicImpl implements IElectronic{
+    @Override
+    public int getElectricityUse() {
+        return 0;
+    }
+}
+```
+
+
+
+- 1)接口中定义的变量会在编译的时候自动加上 `public static final` 修饰符，也就是说 LED 变量其实是一个常量。
+- 2)没有使用 `private`、`default` 或者 `static` 关键字修饰的方法是隐式抽象的，在编译的时候会自动加上 `public abstract` 修饰符。也就是说 `getElectricityUse()`其实是一个抽象方法，没有方法体——这是定义接口的本意。
+- 3)从 Java 8 开始，接口中允许有静态方法，比如说 `isEnergyEfficient()` 方法。
+
+静态方法无法由（实现了该接口的）类的对象调用，它只能通过接口的名字来调用，比如说 `Electronic.isEnergyEfficient("LED")`。
+
+接口中定义静态方法的目的是为了提供一种简单的机制，使我们不必创建对象就能调用方法，从而提高接口的竞争力。
+
+- 4)接口中允许定义 `default` 方法也是从 Java 8 开始
+
+比如说 `printDescription()`，它始终由一个代码块组成，为实现该接口而不覆盖该方法的类提供默认实现，也就是说，无法直接使用一个“;”号来结束默认方法——编译器会报错的。
+
+ 下面是接口的反编译字节码
+
+```java
+public interface  IElectronic {
+  public static final java.lang.String LED;
+  public abstract int getElectricityUse();
+  public static boolean isEnergyEfficient(java.lang.String);
+  public void printDescription();
+}
+//接口中定义的所有变量或者方法，都会自动添加上 public 关键字
+```
+
+  
 
 ### 接口和抽象类的区别是什么
 

@@ -1,5 +1,10 @@
 package org.xiyou.leetcode.leetcode;
 
+import java.util.ArrayList;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Stack;
+
 /**
  * @author xiyou
  * @version 1.0
@@ -9,7 +14,7 @@ package org.xiyou.leetcode.leetcode;
 
 public class Test {
 
-    public static void test45(){
+    public static void test45() {
         try {
             Class.forName("org.xiyou.leetcode.javabase.ClassForName");
             System.out.println("#########-------------结束符------------##########");
@@ -17,7 +22,8 @@ public class Test {
             e.printStackTrace();
         }
     }
-    public static void test44(){
+
+    public static void test44() {
         try {
             ClassLoader.getSystemClassLoader().loadClass("org.xiyou.leetcode.javabase.ClassForName");
             System.out.println("#########-------------结束符------------##########");
@@ -28,6 +34,7 @@ public class Test {
 
     public static void main(String[] args) {
         test44();
+
 //        test45();
     }
 }
