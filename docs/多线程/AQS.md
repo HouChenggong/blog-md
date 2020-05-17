@@ -389,14 +389,28 @@ CyclicBarrier回环屏障，主要是等待一组线程到底同一个状态的�
 
 ### ReadWriteLock
 
+首先明确一下，不是说ReentrantLock不好，只是ReentrantLock某些时候有局限。如果使用ReentrantLock，可能本身是为了防止线程A在写数据、线程B在读数据造成的数据不一致，但这样，如果线程C在读数据、线程D也在读数据，读数据是不会改变数据的，没有必要加锁，但是还是加锁了，降低了程序的性能。
 
+因为这个，才诞生了读写锁ReadWriteLock。ReadWriteLock是一个读写锁接口，ReentrantReadWriteLock是ReadWriteLock接口的一个具体实现，实现了读写的分离，**读锁是共享的，写锁是独占的**，读和读之间不会互斥，读和写、写和读、写和写之间才会互斥，提升了读写的性能。
 
 ### ReentrantLock
 
+synchronized是和if、else、for、while一样的关键字，ReentrantLock是类，这是二者的本质区别。既然ReentrantLock是类，那么它就提供了比synchronized更多更灵活的特性，可以被继承、可以有方法、可以有各种各样的类变量，ReentrantLock比synchronized的扩展性体现在几点上：
 
+（1）ReentrantLock可以对获取锁的等待时间进行设置，这样就避免了死锁
 
+（2）ReentrantLock可以获取各种锁的信息
 
+（3）ReentrantLock可以灵活地实现多路通知
 
+另外，二者的锁机制其实也是不一样的。ReentrantLock底层调用的是Unsafe的park方法加锁，
 
+### ConcurrentSkipListMap
+
+concurrentSkipListMap通过跳表来实现的高并发容器并且这个Map是有排序的。
+
+跳表是什么样的结构呢?底层本身存储的元素一个链表，它是排好顺序的，大家知道当一个链表排好顺序的时候往里插入是特别困难的，查找的时候也特别麻烦，因为你得从头去遍历查找这个元素到底在哪里。
+
+所以就出现了这个跳表的结构，底层是一个链表，链表查找的时候比较困难怎么办，那么我们在这些链表的基础上在拿出一些关键元素来，在上面做一层，那这个关键元素的这一层也是一个链表，那这个数量特别大的话在这个基础之上在拿一层出来再做一个链表， 每层链表的数据越来越少，而且它是分层，在我们查找的时候从顶层往下开始查找。
 
 
