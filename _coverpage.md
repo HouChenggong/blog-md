@@ -6,7 +6,7 @@
 
 [CSDN](https://blog.csdn.net/qq_39455116)
 [GitHub](https://github.com/HouChenggong)
-[gitee](https://gitee.com/cnxiyou)
+[个人随笔](./docs/个人随笔)
 [开始阅读](./README)
 
 
