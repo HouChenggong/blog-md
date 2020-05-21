@@ -262,3 +262,105 @@ Java1.8相比1.7做了调整，1.7做了四次移位和四次异或，但明显J
 ### 1 长度为什么是2的幂次方？
 
 为了能让 HashMap 存取高效，尽量较少碰撞，也就是要尽量把数据分配均匀。我们上面也讲到了过了，Hash 值的范围值-2147483648到2147483647，前后加起来大概40亿的映射空间，只要哈希函数映射得比较均匀松散，一般应用是很难出现碰撞的。但问题是一个40亿长度的数组，内存是放不下的。所以这个散列值是不能直接拿来用的。用之前还要先做对数组的长度取模运算，得到的余数才能用来要存放的位置也就是对应的数组下标。这个数组下标的计算方法是“ `(n - 1) & hash`”。（n代表数组长度）。这也就解释了 HashMap 的长度为什么是2的幂次方。
+
+### 2. JDK7为啥会出现环形链表？
+
+
+
+主要是体现在扩容的时候，要转移
+
+```java
+void transfer(Entry[] newTable, boolean rehash) {
+    int newCapacity = newTable.length;
+    for (Entry<K,V> e : table) {
+        while(null != e) {
+            Entry<K,V> next = e.next;    //线程1拿到a结点，执行完这一句。线程2已经处理好整个链表。
+            if (rehash) {
+                e.hash = null == e.key ? 0 : hash(e.key);
+            }
+            int i = indexFor(e.hash, newCapacity);
+            e.next = newTable[i];
+            newTable[i] = e;
+            e = next;
+        }
+    }
+}
+```
+
+看不懂代码没有关系，其实原理就是把链表翻转。先回顾一下链表翻转，用的就是头插法
+
+```java
+ public ListNode reverseList(ListNode head) {
+        ListNode root=head;
+        ListNode pre=null;
+        while(root!=null){
+            ListNode temp= root;
+            root=root.next;
+            temp.next=pre;
+            pre=temp;
+        }
+        return pre;
+    }
+```
+
+1. 刚开始如果数据是：ABC 其中A是头
+
+![](./img/链表初始1.png)
+
+
+
+恰巧ABC重新计算位置之后还在一个数组上，比如换了一个位置7
+
+2. 那么翻转链表后，链表就变成了CBA其中C变成了头，没有问题，不管怎么实现其实都是翻转链表
+
+ ![](./img/链表正常执行.png)
+
+
+
+3. 单线程这样肯定没有问题，如果是多线程，当第一个线程T2标记好当前值e，标记好下一个值next值之后， 比如线程2标记好了`e=a, b=next`但是这个时候线程开始切换
+
+   因为虽然是T2你标记好了e 和next但是别的线程才刚开始执行，所以别的线程T1会按照自己的进行重新标记，然后线程T1按照自己的逻辑顺序执行，把代码变成了C-B-A，如下图所示，但是我们要始终记住，T2的标记是`e=a,next=b`
+
+![](./img/线程开始切换1.png)
+
+
+
+4. 所以当T1执行完之后，T2还是会按照自己的步骤进行翻转链表，这个时候它会把变量e变成头节点，然后把next作为下一次遍历的节点，如下图所示：
+
+```java
+e.next = newTable[i];//这时newTable[i]是null,所以这句话就把a指向了null
+newTable[i] = e;//把头节点指向了a
+e = next; //但是这时next为b，所以下次循环肯定要继续
+然后就变成了下图
+```
+
+ ![](./img/线程切换2.png)
+
+
+
+5. 但是由于当前值e并不是null，所以要继续翻转链表，把b变成头节点，指针next指向e的下一个节点，如下图所示：
+
+![](./img/线程切换3.png)
+
+ 把头换成b
+
+6. 由于e=a还不为空，那再把e=a变成头节点，同时判等e.next是不是Null，这个时候为空了，停止判断，生成下面的图
+
+为啥：再来看代码：
+
+```java
+e.next = newTable[i];//这时newTable[i]是b,所以这句话就把a指向了b
+newTable[i] = e;//把头节点指向了a
+e = next;//e=next，但是这时next为空，所以要停止循环判断了
+```
+
+![](./img/最终.png)
+
+
+
+推荐：[推荐阅读](https://juejin.im/post/5a66a08d5188253dc3321da0)
+
+
+
+## hashmap一些使用建议
+

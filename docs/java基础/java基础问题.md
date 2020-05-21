@@ -235,53 +235,17 @@ public void consumer(){
 
 ### 5.解决虚假唤醒问题为啥用while而不用if
 
-```java
-//下面的代码将一直等待下去，而不会打印结果        
-    public static void main(String[] args) throws InterruptedException {
-        Boolean flag=true;
-        Object o=new Object();
-        synchronized (o){
-            while (flag){
-                o.wait();
-            }
-            System.out.println("---");
-        }
-    }
-```
+运行下面的案例你就明白了
 
-```
-    public static void main(String[] args) throws InterruptedException {
-        Boolean flag=true;
-        Object o=new Object();
-        synchronized (o){
-            if (flag){
-                o.wait();
-            }
-            System.out.println("---");
-        }
-    }
-```
+[一个比较好的案例](https://blog.csdn.net/qq_39455116/article/details/87101633)
 
-其实在jdk的API文档中就说明了该问题,官方推荐使用whlie对wait()进行包裹
-
-  要想知道为什么使用while(count == 0)，可以先看看使用if(count ==0)会有什么问题。还是基于上面的代码实例，当前两个线程的执行情况是，线程T1执行obj.notify()方法，线程T2执行obj.wait()方法。如果此时有一个线程T3也作为消费者开始执行consumer()方法，可能会出现这种情况：
-
-  1.线程T1执行obj.notify()；
-
-  2.线程T2被唤醒（注意：唤醒操作只是将线程从管程中的等待队列中拿取来放到管程的入口队列中去竞争锁，而不是直接得到锁），尝试去竞争obj对象锁；
-
-  3.线程T3执行consumer()方法，竞争到锁，并进行消费，将count-1，即count又变为0，然后释放锁；
-
-  4.线程T2获取到锁，执行消费逻辑（因为为if(count == 0)，虽然把执行了this.wait但是if只有一次，所以还是直接往下执行消费逻辑了）；
-
-很明显，此时count已经被线程T3消费掉了，count的值又变回0了，线程T2去执行消费逻辑是存在问题的，这就是**虚假唤醒**的问题。但是如果将if(count == 0)改为while(count == 0)就不会有问题了，因为线程T2拿到锁之后还会去判断一下count的值是不是0，非0的情况下才会去执行消费的逻辑。
-
-## String相关类
-
+## String 
 
 **String 源码**
 
 ```java
+public final class String
+    implements java.io.Serializable, Comparable<String>, CharSequence
 private final char value[];
 private int hash;  
 //String 重写了它的hash方法
@@ -361,7 +325,7 @@ public int hashCode() {
 > 
 
 ```
-    //JDK1.8 String 的结构
+    //JDK1.9 String 的结构
     private final byte[] value;
 
     private final byte coder;
@@ -369,6 +333,199 @@ public int hashCode() {
     @Native static final byte LATIN1 = 0;
     @Native static final byte UTF16  = 1;
 ```
+
+
+
+### String拼接方法
+
+测试过程，先新建一个类
+
+```
+public class TestString {
+    public static void main(String[] args) {
+        String a = "a";
+        a = a + "b";
+    }
+}
+```
+
+然后命令行里面输入：`javac TestString.java`这个时候会出现TestString.class在同级目录中
+
+然后输入: `javap -verbose  TestString` 即可看到反编译的字节码
+
+#### 1. 直接+
+
+```
+String a="a"+"b";
+//javac 反编译出来是这样的
+   String var1 = "ab";
+//javap 出来是下面这样的
+ // String ab
+```
+
+
+
+#### 2.在一个对象上+
+
+发现用到了StringBuilder
+
+```java
+String a = "a";
+a = a + "b"; 
+```
+
+相当于
+
+```java
+String a="a";
+a=StringBuilder.append(a).append(b);
+```
+
+
+
+```
+String a = "a";
+a = a + "b";     
+//javac 出来是这样的
+String var1 = "a";
+var1 = var1 + "b";
+//javap 出来是下面这样的
+stack=2, locals=2, args_size=1
+0: ldc           #2                  // String a
+2: astore_1
+3: new           #3                  // class java/lang/StringBuilder
+6: dup
+7: invokespecial #4                  // Method java/lang/StringBuilder."<init>":()V
+10: aload_1
+11: invokevirtual #5                  // Method java/lang/StringBuilder.append:(Ljava/lang/String;)Ljava/lang/StringBuilder;
+14: ldc           #6                  // String b
+16: invokevirtual #5                  // Method java/lang/StringBuilder.append:(Ljava/lang/String;)Ljava/lang/StringBuilder;
+19: invokevirtual #7                  // Method java/lang/StringBuilder.toString:()Ljava/lang/String;
+
+```
+
+#### 3.String.join()
+
+```java
+public static String join(CharSequence delimiter, CharSequence... elements) {
+    Objects.requireNonNull(delimiter);
+    Objects.requireNonNull(elements);
+    // Number of elements not likely worth Arrays.stream overhead.
+    StringJoiner joiner = new StringJoiner(delimiter);
+    for (CharSequence cs: elements) {
+        joiner.add(cs);
+    }
+    return joiner.toString();
+}
+```
+
+发现底层用的是StringJoiner对象里面的add()方法
+
+#### 4.concat()
+
+这段代码首先创建了一个字符数组，长度是已有字符串和待拼接字符串的长度之和，再把两个字符串的值复制到新的字符数组中，并使用这个字符数组创建一个新的String对象并返回。通过源码我们也可以看到，经过concat方法，其实是new了一个新的String
+
+```java
+    public String concat(String str) {
+        int otherLen = str.length();
+        if (otherLen == 0) {
+            return this;
+        }
+        int len = value.length;
+        char buf[] = Arrays.copyOf(value, len + otherLen);
+        str.getChars(buf, len);
+        return new String(buf, true);
+    }
+```
+
+
+
+#### 5.StringJoiner、StringBuffer、StringBuilder
+
+### StringJoiner
+
+```java
+        StringJoiner joiner=new StringJoiner("-");
+        joiner.add("1");
+        joiner.add("2");
+        joiner.add("3");
+        System.out.println(joiner);//1-2-3
+//如果把上面的换一行代码
+   StringJoiner joiner=new StringJoiner("-","[","]");
+//结果就是：[1-2-3]
+```
+
+StringJoiner源码：内部是用StringBuilder进行拼接的
+
+
+
+```java
+public final class StringJoiner {
+//前缀
+private final String prefix;
+//分隔符
+private final String delimiter;
+//后缀
+private final String suffix;
+//值
+private StringBuilder value;
+//空值,如果传入的值是null,默认是前缀加后缀
+private String emptyValue;
+    //只有分隔符的构造函数
+    public StringJoiner(CharSequence delimiter) {
+        this(delimiter, "", "");
+    }
+		//构造函数，分隔符、前缀、后缀
+        public StringJoiner(CharSequence delimiter,
+                        CharSequence prefix,
+                        CharSequence suffix) {
+        this.prefix = prefix.toString();
+        this.delimiter = delimiter.toString();
+        this.suffix = suffix.toString();
+            //空值为前缀+间隔符
+        this.emptyValue = this.prefix + this.suffix;
+        }
+}
+```
+
+add方法
+
+```java
+    public StringJoiner add(CharSequence newElement) {
+        prepareBuilder().append(newElement);
+        return this;
+    }
+    
+private StringBuilder prepareBuilder() {
+        if (value != null) {
+        //添加分隔符
+            value.append(delimiter);
+        } else {
+        //添加前缀
+            value = new StringBuilder().append(prefix);
+        }
+        return value;
+    }
+    
+     @Override
+    public String toString() {
+        if (value == null) {
+            return emptyValue;
+        } else {
+            if (suffix.equals("")) {
+                return value.toString();
+            } else {
+                int initialLength = value.length();
+                String result = value.append(suffix).toString();
+                // reset value to pre-append initialLength
+                value.setLength(initialLength);
+                return result;
+            }
+        }
+    }
+```
+
+### StringBuffer与StringBuilder
 
 
 
@@ -399,6 +556,22 @@ abstract class AbstractStringBuilder implements Appendable, CharSequence {
 
 String 中的对象是不可变的，也就可以理解为常量，线程安全。AbstractStringBuilder 是 StringBuilder 与 StringBuffer 的公共父类，定义了一些字符串的基本操作，如 expandCapacity、append、insert、indexOf 等公共方法。StringBuffer 对方法加了同步锁或者对调用的方法加了同步锁，所以是线程安全的。StringBuilder 并没有对方法进行加同步锁，所以是非线程安全的。
 
+```java
+    //StringBuffer源码
+    @Override
+    public synchronized StringBuffer append(String str) {
+        toStringCache = null;
+        super.append(str);
+        return this;
+    }
+    //StringBuilder源码
+    @Override
+    public StringBuilder append(String str) {
+        super.append(str);
+        return this;
+    }
+```
+
 **性能**
 
 每次对 String 类型进行改变的时候，都会生成一个新的 String 对象，然后将指针指向新的 String 对象。StringBuffer 每次都会对 StringBuffer 对象本身进行操作，而不是生成新的对象并改变对象引用。相同情况下使用 StringBuilder 相比使用 StringBuffer 仅能获得 10%~15% 左右的性能提升，但却要冒多线程不安全的风险。
@@ -409,7 +582,8 @@ String 中的对象是不可变的，也就可以理解为常量，线程安全�
 2. 单线程操作字符串缓冲区下操作大量数据: 适用 StringBuilder
 3. 多线程操作字符串缓冲区下操作大量数据: 适用 StringBuffer
 
-### == 与 equals(重要)
+## hashcode equals 
+### == 与 equals的区别
 
 **==** : 它的作用是判断两个对象的地址是不是相等。即，判断两个对象是不是同一个对象(基本数据类型==比较的是值，引用数据类型==比较的是内存地址)。
 
@@ -444,6 +618,46 @@ public class test1 {
 
 - String 中的 equals 方法是被重写过的，因为 object 的 equals 方法是比较的对象的内存地址，而 String 的 equals 方法比较的是对象的值。
 - 当创建 String 类型的对象时，虚拟机会在常量池中查找有没有已经存在的值和要创建的值相同的对象，如果有就把它赋给当前引用。如果没有就在常量池中重新创建一个 String 对象。
+
+
+
+
+### hashCode（）介绍
+
+hashCode() 的作用是根据对象内存地址获取哈希码 ；它实际上是返回一个 int 整数 
+
+hashcode有自己的一套算法，当然一个对象无论计算多少次，hashcode都是相同的,当然是在没有重写hashcode的情况下
+
+### 为什么要有 hashCode
+
+我的理解是：如果你没有使用hash类型的数据结构的时候，就没有啥意义，使用hash类型的结构的时候，因为存储的方式是用hashcode来确定列表中的位置
+
+- 那引入为啥使用hashmap和hashset的问题
+
+比如说，你有1万个对象，里面有只有100个id是一样的，你想获取这100个不一样的id，你要怎么办？
+
+这个时候你直接说HashSet，或者数据库去重，但是如果让你不用这些结构，你怎么办？
+
+用一个数组，存储不一样的id，如果存在就不存了，但是每次都要去数组里面从头到尾去对比有没有一样的，如果数组长度小还比较好，如果数组长度是1万个，你怎么办？
+
+其实hashcode就是为了简化我们遍历用的，我们不用每个都去对比，我们只需要对比相同hashcode的对象即可
+
+
+
+ 这个**哈希码的作用**是确定该对象在哈希表中的索引位置。**`hashCode()`在散列表中才有用，在其它情况下没用**。在散列表中 hashCode() 的作用是获取对象的散列码，进而确定该对象在散列表中的位置。
+
+### hashCode（）与 equals（）的相关规定
+
+1. 如果两个对象相等，则 hashcode 一定也是相同的
+2. 两个对象相等,对两个对象分别调用 equals 方法都返回 true
+3. 两个对象有相同的 hashcode 值，它们也不一定是相等的
+4. **因此，equals 方法被覆盖过，则 hashCode 方法也必须被覆盖**
+5. hashCode() 的默认行为是对堆上的对象产生独特值。如果没有重写 hashCode()，则该 class 的两个对象无论如何都不会相等（即使这两个对象指向相同的数据）
+
+### 为啥重写equals必须重写hashcode
+
+不重写就会出现equals相同，但是hashcode不同的情况，我们在用hash类型的数据结构的时候，就达不到我们想要的效果
+
 
 ### 自动拆箱与装箱
 
@@ -483,37 +697,7 @@ public class test1 {
         System.out.println(g.equals(a + h));//true
 
 ```
-### Object有哪些方法
-getClass()、hashCode()  、equals(Object)、  clone()  、toString()  、notify()、 notifyAll() 、wait() 
-
-常用的是`equals(Object)、toString()、  hashCode()`
-
-###  hashCode 与 equals (重要)
-
-面试官可能会问你：“你重写过 hashcode 和 equals 么，为什么重写 equals 时必须重写 hashCode 方法？”
-
-#### hashCode（）介绍
-
-hashCode() 的作用是获取哈希码，也称为散列码；它实际上是返回一个 int 整数。这个哈希码的作用是确定该对象在哈希表中的索引位置。hashCode() 定义在 JDK 的 Object.java 中，这就意味着 Java 中的任何类都包含有 hashCode() 函数。
-
-散列表存储的是键值对(key-value)，它的特点是：能根据“键”快速的检索出对应的“值”。这其中就利用到了散列码！（可以快速找到所需要的对象）
-
-#### 为什么要有 hashCode
-
-**我们先以“HashSet 如何检查重复”为例子来说明为什么要有 hashCode：** 当你把对象加入 HashSet 时，HashSet 会先计算对象的 hashcode 值来判断对象加入的位置，同时也会与该位置其他已经加入的对象的 hashcode 值作比较，如果没有相符的 hashcode，HashSet 会假设对象没有重复出现。但是如果发现有相同 hashcode 值的对象，这时会调用 `equals()`方法来检查 hashcode 相等的对象是否真的相同。如果两者相同，HashSet 就不会让其加入操作成功。如果不同的话，就会重新散列到其他位置。（摘自我的 Java 启蒙书《Head first java》第二版）。这样我们就大大减少了 equals 的次数，相应就大大提高了执行速度。
-
-通过我们可以看出：`hashCode()` 的作用就是**获取哈希码**，也称为散列码；它实际上是返回一个 int 整数。这个**哈希码的作用**是确定该对象在哈希表中的索引位置。**`hashCode()`在散列表中才有用，在其它情况下没用**。在散列表中 hashCode() 的作用是获取对象的散列码，进而确定该对象在散列表中的位置。
-
-#### hashCode（）与 equals（）的相关规定
-
-1. 如果两个对象相等，则 hashcode 一定也是相同的
-2. 两个对象相等,对两个对象分别调用 equals 方法都返回 true
-3. 两个对象有相同的 hashcode 值，它们也不一定是相等的
-4. **因此，equals 方法被覆盖过，则 hashCode 方法也必须被覆盖**
-5. hashCode() 的默认行为是对堆上的对象产生独特值。如果没有重写 hashCode()，则该 class 的两个对象无论如何都不会相等（即使这两个对象指向相同的数据）
-
-推荐阅读：[Java hashCode() 和 equals()的若干问题解答](https://www.cnblogs.com/skywang12345/p/3324958.html)
-
+ 
 ### 为什么 Java 中只有值传递？
 
 [为啥只有值传参](<https://blog.csdn.net/qq_39455116/article/details/83617271>)
