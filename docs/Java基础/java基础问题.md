@@ -1,3 +1,5 @@
+
+
 ## 继承封装和多态
 
 在 Java 中有两种形式可以实现多态：继承（多个子类对同一方法的重写）和接口（实现接口并覆盖接口中同一方法）。
@@ -60,13 +62,315 @@ class PersonPlayServiceImpl implements PlayService{
 不能被重写，可以被重载，也就是为什么有那么多构造函数的原因，都是重载的
 
 
-### String StringBuffer 和 StringBuilder  
+## Object类
 
-**可变性**
+```java
+public final native Class<?> getClass();
+//本地方法
+public native int hashCode();
+//比较内存地址
+  public boolean equals(Object obj) {
+        return (this == obj);
+    }
+//克隆
+protected native Object clone() throws CloneNotSupportedException;    
+//toString
+ public String toString() {
+        return getClass().getName() + "@" + Integer.toHexString(hashCode());
+    }  
+//随机唤醒一个线程
+public final native void notify();
+//唤醒所有的线程
+public final native void notifyAll();
+//等待并释放锁，至于为啥抛出异常，是为了防止
+public final native void wait(long timeout) throws InterruptedException;
+
+//当垃圾回收器确定不存在对该对象的更多引用时，由对象的垃圾回收器调用此方法。
+protected void finalize() throws Throwable { }
+```
+
+### 使用注意
+
+wait, notify/notifyAll 要在 synchronized 内部被使用，并且，如果锁的对象是this，就要 this.wait，this.notify/this.notifyAll , 否则JVM就会抛出 java.lang.IllegalMonitorStateException 的。
+
+```java
+synchronized (this){
+	obj.notify();
+}
+//这样是会报错的，因为选错了对象
+```
+
+
+
+### 1.为什么 wait，notify 和 notifyAll 是在 Object 类中定义的而不是在 Thread 类中定义?
+
+1. 实际上实现的时线程之间的通信机制，用来通知线程的阻塞与唤醒。
+
+2. 为了每个对象都可上锁。由于wait，notify和notifyAll都是锁级别的操作，所以把他们定义在Object类中因为锁属于对象。
+
+3. 线程A并不知道当前对象被哪个线程占用着，它只知道当前对象肯定是被某个线程占用着，所以他（线程A）是被通知的一方，也就是等对象通知他什么时候可以区获取锁。
+
+就比如说，10个顾客（线程）去预约一个餐厅（对象），假设他们都会占用该餐厅的所有资源，肯定是餐厅通知他们什么时候可以来，而不是一个顾客吃完去通知下一个顾客
+
+###  2.notify()和notifyAll ()执行完会释放锁吗？
+
+不会
+
+直到执行完synchronized 代码块的代码或是中途遇到wait() ，再次释放锁。
+
+也就是说，notify/notifyAll() 的执行只是唤醒沉睡的线程，而不会立即释放锁，锁的释放要看代码块的具体执行情况
+
+### 3.为什么wait()、notify()和notifyAll ()必须在同步方法或者同步块中被调用？
+
+比如说下面的代码：
+
+```java
+    public static void main(String[] args) throws InterruptedException {
+        Object o=new Object();
+     	o.wait();
+     }
+//Exception in thread "main" java.lang.IllegalMonitorStateException
+```
+
+下面的代码不会抛出异常
+
+```java
+ public static void main(String[] args) throws InterruptedException {
+        Object o=new Object();
+        synchronized (o){
+            o.wait(1000);
+        }
+        System.out.println("end");
+    }
+    //end
+```
+
+
+
+0. JDK要求对object.wait()和object().notify方法必须在synchronized代码块内部使用，否则运行时会抛出IllegalMonitorStateException异常。
+1. 这三个方法想要运行的前提是他们有当前对象的锁，然后再执行相关的方法
+2. 想要获取锁，就会出现线程安全的问题，一个对象不能让两个线程获取锁，所以需要同步机制，所以他们只能在同步方法或者同步块中被调用。
+
+### 4. 什么时候用notify和notifyAll
+
+先说两个概念：锁池和等待池
+
+- 锁池:假设线程A已经拥有了某个对象(注意:不是类)的锁，而其它的线程想要调用这个对象的某个synchronized方法(或者synchronized块)，由于这些线程在进入对象的synchronized方法之前必须先获得该对象的锁的拥有权，但是该对象的锁目前正被线程A拥有，所以这些线程就进入了该对象的锁池中。
+- 等待池:(因为wait()方法必须出现在synchronized中，这样自然在执行wait()方法之前线程A就已经拥有了该对象的锁)。假设一个线程A调用了某个对象的wait()方法，线程A就会释放该对象的锁后，进入到了该对象的等待池中。如果另外的一个线程调用了相同对象的notifyAll()方法，那么处于该对象的等待池中的线程就会全部进入该对象的锁池中，准备争夺锁的拥有权。如果另外的一个线程调用了相同对象的notify()方法，那么仅仅有一个处于该对象的等待池中的线程(随机)会进入该对象的锁池.
+
+ 然后再来说notify和notifyAll的区别
+
+-  如果线程调用了对象的 wait()方法，那么线程便会处于该对象的**等待池**中，等待池中的线程**不会去竞争该对象的锁**。
+- 当有线程调用了对象的 **notifyAll**()方法（唤醒所有 wait 线程）或 **notify**()方法（只随机唤醒一个 wait 线程），被唤醒的的线程便会进入该对象的锁池中，锁池中的线程会去竞争该对象锁。也就是说，调用了notify后只要一个线程会由等待池进入锁池，而notifyAll会将该对象等待池内的所有线程移动到锁池中，等待锁竞争
+- 优先级高的线程竞争到对象锁的概率大，假若某线程没有竞争到该对象锁，它**还会留在锁池中**，唯有线程再次调用 wait()方法，它才会重新回到等待池中。而竞争到对象锁的线程则继续往下执行，直到执行完了 synchronized 代码块，它会释放掉该对象锁，这时锁池中的线程会继续竞争该对象锁。
+
+ 
+
+### 4.举个例子证明为啥需要同步代码块
+- Lost Wake-Up Problem 问题
+
+  一个简单的生产者-消费者模型的实现如下：当count为0的时候，生产者进行生产操作，并将count+1，然后调用notify()方法通知；当count为0时，消费者会调用wait()方法释放锁进行等待。
+
+```java
+private int count = 0;
+private Object obj;
+
+public void producer(){
+    if (count == 0){
+        //省略生产者逻辑
+        count++;
+        obj.notify();
+　　}
+}
+
+public void consumer(){
+    while (count == 0){
+　　　　obj.wait();    
+    }
+    //省略消费逻辑
+}
+```
+
+  乍一看，通过上述代码实现了生产者-消费者的功能，但是仔细一想，存在问题。假如此时线程T1在执行producer的逻辑，线程T2在执行consumer的逻辑，如果代码的执行顺序变成下面这样，就会有问题：
+
+​    1.线程T2执行while (count == 0)，表达式成立，进入while循环；
+
+​    2.线程T1执行if (count == 0)，表达式成立，进入if消息体；
+
+​    3.线程T1执行if消息体内容，最终调用obj.notify()（注意，此时线程T2未执行obj.wait()，notify()不会唤醒任何线程）；
+
+​    4.线程T2执行obj.wait()进行等待；
+
+  这样执行完之后，count的值为1，生产者不会再进行生产操作（也就不会调用obj.notify()，而此时消费者线程T2处于等待状态（需要obj.notify()来唤醒），消费者线程就永远地死等下去了，这就是多线程编程中臭名昭著的**Lost Wake-Up Problem**问题。
+
+- 改成同步代码块有什么作用？
+
+仔细分析上面的问题，原因很简单，就是对count变量的读写存在竞态条件，举个例子，consumer()方法原本的用意是在执行obj.wait()的时候，count的值必须为0，也就是obj.wait()和count为0是绑定的，但是此时如果有另外一个线程在执行producer()方法，可能就会在执行while (count == 0)到obj.wait()之间对count的值进行修改，从而出现非预期的情况（即在执行obj.wait()方法的时候，count的值不是0）。
+
+```java
+private int count = 0;
+private Object obj;
+ 
+public void producer(){
+    synchonized(obj){
+        if (count == 0){
+            //省略生产逻辑
+            count++;
+            obj.notify();
+        }
+    }
+}
+ 
+public void consumer(){
+    synchonized(obj){
+        while (count == 0){
+            obj.wait();    
+        }
+        //省略消费逻辑
+    }
+}
+```
+
+此时，由于只有线程拿到obj对象的锁才能进入同步代码块，所以能够保证生产者和消费者只有一个线程在执行，也就保证了在执行while (count == 0)到obj.wait()之间count的值不会发生改变，也就是上面1、4步骤之间，不可能会有2、3步骤了。
+
+### 5.解决虚假唤醒问题为啥用while而不用if
+
+```java
+//下面的代码将一直等待下去，而不会打印结果        
+    public static void main(String[] args) throws InterruptedException {
+        Boolean flag=true;
+        Object o=new Object();
+        synchronized (o){
+            while (flag){
+                o.wait();
+            }
+            System.out.println("---");
+        }
+    }
+```
+
+```
+    public static void main(String[] args) throws InterruptedException {
+        Boolean flag=true;
+        Object o=new Object();
+        synchronized (o){
+            if (flag){
+                o.wait();
+            }
+            System.out.println("---");
+        }
+    }
+```
+
+其实在jdk的API文档中就说明了该问题,官方推荐使用whlie对wait()进行包裹
+
+  要想知道为什么使用while(count == 0)，可以先看看使用if(count ==0)会有什么问题。还是基于上面的代码实例，当前两个线程的执行情况是，线程T1执行obj.notify()方法，线程T2执行obj.wait()方法。如果此时有一个线程T3也作为消费者开始执行consumer()方法，可能会出现这种情况：
+
+  1.线程T1执行obj.notify()；
+
+  2.线程T2被唤醒（注意：唤醒操作只是将线程从管程中的等待队列中拿取来放到管程的入口队列中去竞争锁，而不是直接得到锁），尝试去竞争obj对象锁；
+
+  3.线程T3执行consumer()方法，竞争到锁，并进行消费，将count-1，即count又变为0，然后释放锁；
+
+  4.线程T2获取到锁，执行消费逻辑（因为为if(count == 0)，虽然把执行了this.wait但是if只有一次，所以还是直接往下执行消费逻辑了）；
+
+很明显，此时count已经被线程T3消费掉了，count的值又变回0了，线程T2去执行消费逻辑是存在问题的，这就是**虚假唤醒**的问题。但是如果将if(count == 0)改为while(count == 0)就不会有问题了，因为线程T2拿到锁之后还会去判断一下count的值是不是0，非0的情况下才会去执行消费的逻辑。
+
+## String相关类
+
+
+**String 源码**
+
+```java
+private final char value[];
+private int hash;  
+//String 重写了它的hash方法
+public int hashCode() {
+        int h = hash;
+        if (h == 0 && value.length > 0) {
+            char val[] = value;
+
+            for (int i = 0; i < value.length; i++) {
+                h = 31 * h + val[i];
+            }
+            hash = h;
+        }
+        return h;
+    }
+//String 重写了它的equals方法
+//其实就是判断每一格字符是否相等
+  public boolean equals(Object anObject) {
+        if (this == anObject) {
+            return true;
+        }
+        if (anObject instanceof String) {
+            String anotherString = (String)anObject;
+            int n = value.length;
+            if (n == anotherString.value.length) {
+                char v1[] = value;
+                char v2[] = anotherString.value;
+                int i = 0;
+                while (n-- != 0) {
+                    if (v1[i] != v2[i])
+                        return false;
+                    i++;
+                }
+                return true;
+            }
+        }
+        return false;
+    }
+```
+
+### string的hash值为啥用31做乘子？
+
+**为啥选用质数？**
+
+这个还不是很理解
+
+“100内所有的质数列举如下: 2、3、5、7、11、13、17、19、23、29、31、37、41、43、47、53、59、61、67、71、73、79、83、89、97
+
+**为啥不用偶数？**
+
+也不是很理解
+
+但是用31的确是有优势的
+
+1. 31是一个不大不小的质数，是作为 hashCode 乘子的优选质数之一。另外一些相近的质数，比如37、41、43等等，也都是不错的选择。那么为啥偏偏选中了31呢？请看第二个原因
+2. 31可以被 JVM 优化，`31 * i = (i << 5) - i`。
+3. 相比37 41等其实hash碰撞的几率差不太多
+
+### string为啥不可变？
+
+可变性**
 
 简单的来说：String 类中使用 final 关键字修饰字符数组来保存字符串，`private final char value[]`，所以 String 对象是不可变的。
 
 > 补充（来自[issue 675](https://github.com/Snailclimb/JavaGuide/issues/675)）：在 Java 9 之后，String 类的实现改用 byte 数组存储字符串 `private final byte[] value`
+>
+> 为什么使用byte字节而舍弃了char字符:
+>
+> 节省内存占用，byte占一个字节(8位)，char占用2个字节（16），相较char节省一半的内存空间。节省gc压力。重构带来的最大好处就是在字符串中所有的字符都小于0xFF的情况下，会节省一半的内存。
+>
+> 针对初始化的字符，对字符长度进行判断选择不同的编码方式。如果是 LATIN-1 编码，则右移0位，数组长度即为字符串长度。而如果是 UTF16 编码，则右移1位，数组长度的二分之一为字符串长度。
+>
+> 因为一个英文就占用一个字节，而中文或者其它的语言可能不太一样需要占用2-3个字节，
+>
+> 老外估计早就想改了，老子可能一辈子做的东西都用不到0xFF之上的字符，却要占我一倍的内存！！哈哈~~
+>
+> 
+
+```
+    //JDK1.8 String 的结构
+    private final byte[] value;
+
+    private final byte coder;
+
+    @Native static final byte LATIN1 = 0;
+    @Native static final byte UTF16  = 1;
+```
+
+
 
 而 StringBuilder 与 StringBuffer 都继承自 AbstractStringBuilder 类，在 AbstractStringBuilder 中也是使用字符数组保存字符串`char[]value` 但是没有用 final 关键字修饰，所以这两种对象都是可变的。
 
@@ -151,7 +455,7 @@ public class test1 {
 **基本类型有**：byte、short、char、int、long、boolean。
 **基本类型的包装类分别是**：Byte、Short、Character、Integer、Long、Boolean。
 
-对于int short long  byte 都是-128 到217之间
+对于int short long  byte 都是-128 到127之间
 
 但是对于double没有实现常量池技术
 
@@ -976,3 +1280,26 @@ public static void test44(){
 在我们熟悉的Spring框架中的IOC的实现就是使用的ClassLoader。
 
 而在我们使用JDBC时通常是使用Class.forName()方法来加载数据库连接驱动。这是因为在JDBC规范中明确要求Driver(数据库驱动)类必须向DriverManager注册自己。
+
+### 双亲委派模型
+
+如果一个类加载器收到了类加载请求，它并不会自己先去加载，而是把这个请求委托给父类的加载器去执行，如果父类加载器还存在其父类加载器，则进一步向上委托，依次递归，请求最终将到达顶层的启动类加载器，如果父类加载器可以完成类加载任务，就**成功返回**，倘若父类加载器无法完成此加载任务，**子加载器才会尝试自己去加载**，这就是双亲委派模式
+
+ userClassLoader——>application——> Extension——> BootStrap ClassLoader
+
+​                              classPath  <JAVA_HOME>\lib\ext  <JAVA_HOME>\lib 
+
+优点：
+
+1. 一个可以避免类的重复加载
+2. 安全
+
+像 java.lang.Object 这些存放在 rt.jar 中的类，无论使用哪个类加载器加载，最终都会委派给最顶端的启动类加载器加载，从而使得不同加载器加载的 Object 类都是同一个。
+
+相反，如果没有使用双亲委派模型，由各个类加载器自行去加载的话，如果用户自己编写了一个称为 java.lang.Object 的类，并放在 classpath 下，那么系统将会出现多个不同的 Object 类，Java 类型体系中最基础的行为也就无法保证。
+
+### 线程
+
+线程创建之后它将处于 **NEW（新建）** 状态，调用 `start()` 方法后开始运行，线程这时候处于 **READY（可运行）** 状态。可运行状态的线程获得了 cpu 时间片（timeslice）后就处于 **RUNNING（运行）** 状态。
+
+当线程执行 `wait()`方法之后，线程进入 **WAITING（等待）**状态。进入等待状态的线程需要依靠其他线程的通知才能够返回到运行状态，而 **TIME_WAITING(超时等待)** 状态相当于在等待状态的基础上增加了超时限制，比如通过 `sleep（long millis）`方法或 `wait（long millis）`方法可以将 Java 线程置于 TIMED WAITING 状态。当超时时间到达后 Java 线程将会返回到 RUNNABLE 状态。当线程调用同步方法时，在没有获取到锁的情况下，线程将会进入到 **BLOCKED（阻塞）** 状态。线程在执行 Runnable 的`run()`方法之后将会进入到 **TERMINATED（终止）** 状态。

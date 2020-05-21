@@ -17,3 +17,9 @@ Spring Web MVC：提供了 Web 应用的 Model-View-Controller 全功能实现
 ### Bean定义5种作用域
 
 singleton（单例） prototype（原型） request session global session
+
+ ### springboot内置tomcat
+
+SpringBoot 的启动是通过 new SpringApplication() 实例来启动的，启动过程主要做如下几件事情：> 1. 配置属性 > 2. 获取监听器，发布应用开始启动事件 > 3. 初始化输入参数 > 4. 配置环境，输出banner > 5. 创建上下文 > 6. 预处理上下文 > 7. 刷新上下文 > 8. 再刷新上下文 > 9. 发布应用已经启动事件 > 10. 发布应用启动完成事件 
+
+而启动 Tomcat 就是在第7步中“刷新上下文”；Tomcat 的启动主要是初始化 2 个核心组件，连接器(Connector)和容器（Container），一个 Tomcat 实例就是一个 Server，一个 Server 包含多个 Service，也就是多个应用程序，每个 Service 包含多个连接器（Connetor）和一个容器（Container),而容器下又有多个子容器，按照父子关系分别为：Engine,Host,Context,Wrapper，其中除了 Engine 外，其余的容器都是可以有多个

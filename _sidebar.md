@@ -23,7 +23,11 @@
 * 多线程
   * [Java写一个死锁](./docs/多线程/java写一个死锁.md)
   * [AQS和JUC](./docs/多线程/AQS.md)
+  * [一个对象在内存的存储](./)
+  * [CAS](./docs/多线程/CAS.md)
   * [volatile](./docs/多线程/volatile和Happens-Before原则.md)
+  * [synchronized](./docs/多线程/synchornized.md)
+  * 
 
 
 * spring
