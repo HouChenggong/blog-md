@@ -11,7 +11,7 @@
  * @author xiyou
  * JDK动态代理
  */
-public interface DataChangeListener {
+public interface PersionService {
  public void sayHello(String name)；
 }
 ```

@@ -697,7 +697,7 @@ hashcode有自己的一套算法，当然一个对象无论计算多少次，has
         System.out.println(g.equals(a + h));//true
 
 ```
- 
+
 ### 为什么 Java 中只有值传递？
 
 [为啥只有值传参](<https://blog.csdn.net/qq_39455116/article/details/83617271>)
@@ -743,12 +743,112 @@ JVM也会往虚拟机栈栈中压入一个栈，即为myTest()栈帧或者myTest
     不同的是副本是值还是引用地址
 ```
 
+## 关键字
+
+
+
 ### final关键字
 
 final 关键字主要用在三个地方：变量、方法、类。
 
 1. 对于一个 final 变量，如果是基本数据类型的变量，则其数值一旦在初始化之后便不能更改；如果是引用类型的变量，则在对其初始化之后便不能再让其指向另一个对象。
 2. 当用 final 修饰一个类时，表明这个类不能被继承。final 类中的所有成员方法都会被隐式地指定为 final 方法。
+
+### this 关键字
+
+- **作用一、消除歧义**
+
+如果参数名和成员变量的名字相同，就需要使用 this 关键字消除歧义：this.age 是指成员变量，age 是指构造方法的参数。
+
+```java
+public class Writer {
+    private int age;
+    private String name;
+
+    public Writer(int age, String name) {
+        this.age = age;
+        this.name = name;
+    }
+}
+```
+
+- **作用二、引用当前类的其他构造方法**
+
+```java
+public class Writer {
+    private int age;
+    private String name;
+
+    public Writer(int age, String name) {
+        this.age = age;
+        this.name = name;
+    }
+	//在无参构造方法中调用有参构造方法：
+    public Writer() {
+        this(18, "xiyou");
+    }
+}
+```
+
+在有参构造方法中调用无参构造方法：
+
+```java
+public class Writer {
+    private int age;
+    private String name;
+
+    public Writer(int age, String name) {
+        //this() 必须是构造方法中的第一条语句，否则就会报错
+        this();
+        this.age = age;
+        this.name = name;
+    }
+
+    public Writer() {
+    }
+}
+```
+
+- **作用三：作为参数传递**
+
+this 就是我们在 `main()` 方法中使用 new 关键字创建的 ThisTest 对象。
+
+```java
+public class ThisTest {
+    public ThisTest() {
+        print(this);
+    }
+
+    private void print(ThisTest thisTest) {
+        System.out.println("print " +thisTest);
+    }
+
+    public static void main(String[] args) {
+        ThisTest test = new ThisTest();
+        System.out.println("main " + test);
+    }
+}
+```
+
+- 作用四：链式调用（建造者模式）不做解读，可以去原文理解
+- 作用五：在内部类访问外部类对象
+
+```java
+public class ThisInnerTest {
+    private String name;
+
+    class InnerClass {
+        //在内部类 InnerClass 的构造方法中，通过外部类.this 可以获取到外部类对象，
+        //然后就可以使用外部类的成员变量了，比如说 name。
+        public InnerClass() {
+            ThisInnerTest thisInnerTest = ThisInnerTest.this;
+            String outerName = thisInnerTest.name;
+        }
+    }
+}
+```
+
+
 
 ### 深拷贝 vs 浅拷贝
 

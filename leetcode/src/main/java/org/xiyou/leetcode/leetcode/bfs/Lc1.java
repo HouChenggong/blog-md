@@ -43,12 +43,12 @@ public class Lc1 {
     public static void main(String[] args) {
         int arr[] = new int[]{1, 3, 5, 7};
         int arr2[] = new int[]{2, 4, 6, 8};
-        ListNode one = ListNode.initListNode(arr);
-        System.out.println(ListNode.toNodeString(one));
-        ListNode two = ListNode.initListNode(arr2);
+//        ListNode one = ListNode.initListNode(arr);
+//        System.out.println(ListNode.toNodeString(one));
+//        ListNode two = ListNode.initListNode(arr2);
 //        System.out.println(ListNode.toNodeString(merge2Lists(one, two)));
         Lc1 lc1 = new Lc1();
-        ListNode res = lc1.dfsMerge2Lists(one, two);
-        System.out.println(ListNode.toNodeString(res));
+//        ListNode res = lc1.dfsMerge2Lists(one, two);
+//        System.out.println(ListNode.toNodeString(res));
     }
 }

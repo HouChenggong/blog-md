@@ -1,0 +1,175 @@
+D:\Program Files\nodejs\node_global\blog\leetcode\src\main\java\org\xiyou\leetcode\thread>javap -verbose TestThread
+警告: 二进制文件TestThread包含org.xiyou.leetcode.thread.TestThread
+Classfile /D:/Program Files/nodejs/node_global/blog/leetcode/src/main/java/org/xiyou/leetcode/thread/TestThread.class
+  Last modified 2020-5-25; size 743 bytes
+  MD5 checksum 13f366c1a1ed3d19fea4cb36bc573780
+  Compiled from "TestThread.java"
+public class org.xiyou.leetcode.thread.TestThread
+  minor version: 0
+  major version: 52
+  flags: ACC_PUBLIC, ACC_SUPER
+Constant pool:
+   #1 = Methodref          #4.#22         // java/lang/Object."<init>":()V
+   #2 = Class              #23            // org/xiyou/leetcode/thread/TestThread
+   #3 = Fieldref           #2.#24         // org/xiyou/leetcode/thread/TestThread.o:Ljava/lang/Object;
+   #4 = Class              #25            // java/lang/Object
+   #5 = Utf8               o
+   #6 = Utf8               Ljava/lang/Object;
+   #7 = Utf8               <init>
+   #8 = Utf8               ()V
+   #9 = Utf8               Code
+  #10 = Utf8               LineNumberTable
+  #11 = Utf8               test
+  #12 = Utf8               test2
+  #13 = Utf8               StackMapTable
+  #14 = Class              #23            // org/xiyou/leetcode/thread/TestThread
+  #15 = Class              #25            // java/lang/Object
+  #16 = Class              #26            // java/lang/Throwable
+  #17 = Utf8               test3
+  #18 = Utf8               test4
+  #19 = Utf8               test5
+  #20 = Utf8               SourceFile
+  #21 = Utf8               TestThread.java
+  #22 = NameAndType        #7:#8          // "<init>":()V
+  #23 = Utf8               org/xiyou/leetcode/thread/TestThread
+  #24 = NameAndType        #5:#6          // o:Ljava/lang/Object;
+  #25 = Utf8               java/lang/Object
+  #26 = Utf8               java/lang/Throwable
+{
+  public java.lang.Object o;
+    descriptor: Ljava/lang/Object;
+    flags: ACC_PUBLIC
+
+  public org.xiyou.leetcode.thread.TestThread();
+    descriptor: ()V
+    flags: ACC_PUBLIC
+    Code:
+      stack=1, locals=1, args_size=1
+         0: aload_0
+         1: invokespecial #1                  // Method java/lang/Object."<init>":()V
+         4: return
+      LineNumberTable:
+        line 7: 0
+
+  synchronized void test();
+    descriptor: ()V
+    flags: ACC_SYNCHRONIZED
+    Code:
+      stack=0, locals=1, args_size=1
+         0: return
+      LineNumberTable:
+        line 12: 0
+
+  void test2();
+    descriptor: ()V
+    flags:
+    Code:
+      stack=2, locals=3, args_size=1
+         0: aload_0
+         1: dup
+         2: astore_1
+         3: monitorenter
+         4: aload_1
+         5: monitorexit
+         6: goto          14
+         9: astore_2
+        10: aload_1
+        11: monitorexit
+        12: aload_2
+        13: athrow
+        14: return
+      Exception table:
+         from    to  target type
+             4     6     9   any
+             9    12     9   any
+      LineNumberTable:
+        line 15: 0
+        line 17: 4
+        line 18: 14
+      StackMapTable: number_of_entries = 2
+        frame_type = 255 /* full_frame */
+          offset_delta = 9
+          locals = [ class org/xiyou/leetcode/thread/TestThread, class java/lang/Object ]
+          stack = [ class java/lang/Throwable ]
+        frame_type = 250 /* chop */
+          offset_delta = 4
+
+  static synchronized void test3();
+    descriptor: ()V
+    flags: ACC_STATIC, ACC_SYNCHRONIZED
+    Code:
+      stack=0, locals=0, args_size=0
+         0: return
+      LineNumberTable:
+        line 22: 0
+
+  void test4();
+    descriptor: ()V
+    flags:
+    Code:
+      stack=2, locals=3, args_size=1
+         0: ldc           #2                  // class org/xiyou/leetcode/thread/TestThread
+         2: dup
+         3: astore_1
+         4: monitorenter
+         5: aload_1
+         6: monitorexit
+         7: goto          15
+        10: astore_2
+        11: aload_1
+        12: monitorexit
+        13: aload_2
+        14: athrow
+        15: return
+      Exception table:
+         from    to  target type
+             5     7    10   any
+            10    13    10   any
+      LineNumberTable:
+        line 25: 0
+        line 27: 5
+        line 28: 15
+      StackMapTable: number_of_entries = 2
+        frame_type = 255 /* full_frame */
+          offset_delta = 10
+          locals = [ class org/xiyou/leetcode/thread/TestThread, class java/lang/Object ]
+          stack = [ class java/lang/Throwable ]
+        frame_type = 250 /* chop */
+          offset_delta = 4
+
+  void test5();
+    descriptor: ()V
+    flags:
+    Code:
+      stack=2, locals=3, args_size=1
+         0: aload_0
+         1: getfield      #3                  // Field o:Ljava/lang/Object;
+         4: dup
+         5: astore_1
+         6: monitorenter
+         7: aload_1
+         8: monitorexit
+         9: goto          17
+        12: astore_2
+        13: aload_1
+        14: monitorexit
+        15: aload_2
+        16: athrow
+        17: return
+      Exception table:
+         from    to  target type
+             7     9    12   any
+            12    15    12   any
+      LineNumberTable:
+        line 31: 0
+        line 33: 7
+        line 34: 17
+      StackMapTable: number_of_entries = 2
+        frame_type = 255 /* full_frame */
+          offset_delta = 12
+          locals = [ class org/xiyou/leetcode/thread/TestThread, class java/lang/Object ]
+          stack = [ class java/lang/Throwable ]
+        frame_type = 250 /* chop */
+          offset_delta = 4
+}
+SourceFile: "TestThread.java"

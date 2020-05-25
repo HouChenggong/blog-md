@@ -301,13 +301,33 @@ Java1.8相比1.7做了调整，1.7做了四次移位和四次异或，但明显J
 
 因为计算机在计算的时候，会把整数换成2进制进行计算
 
- 位运算直接对内存数据进行操作，不需要转成十进制，因此处理速度非常快。
+ 而&运算是位运算的一种，位运算是：直接对内存数据进行操作，不需要转成十进制，因此处理速度非常快。
+
+比如取模运算的Java实现：
+
+```java
+    public static double ramainder(double da, double xiao) {
+        return da - da / xiao * xiao;
+    }
+```
+
+用到了除法乘法和减法，而除法是怎么实现的呢？
+
+
 
 ### 1 长度为什么是2的幂次方？
 
 为了能让 HashMap 存取高效，尽量较少碰撞，也就是要尽量把数据分配均匀。我们上面也讲到了过了，Hash 值的范围值-2147483648到2147483647，前后加起来大概40亿的映射空间，只要哈希函数映射得比较均匀松散，一般应用是很难出现碰撞的。但问题是一个40亿长度的数组，内存是放不下的。所以这个散列值是不能直接拿来用的。用之前还要先做对数组的长度取模运算，得到的余数才能用来要存放的位置也就是对应的数组下标。这个数组下标的计算方法是“ `(n - 1) & hash`”。（n代表数组长度）。这也就解释了 HashMap 的长度为什么是2的幂次方。
 
-其实上面说了很多，还是没有说明为啥用2的幂次方，比如一个对象的hash值后5位是11001
+其实上面说了很多，还是没有说明为啥用2的幂次方？
+
+首先我们先说一个原因！
+
+**第一：为了用&运算！为啥，因为&运算比取模运算快，上面也说了原因**
+
+**第二：用了&运算之后，如果不是2的整数倍，就无法均匀分布！**
+
+距离分析：比如一个对象的hash值后5位是11001
 
 如果数组长度是16，那么对于它在数组中的位置是：
 
@@ -351,7 +371,7 @@ Java1.8相比1.7做了调整，1.7做了四次移位和四次异或，但明显J
 
 其实就是为了2点：
 
-**1- 为了进行计算元素在数组中位置时的与运算，因为2的整数倍不需要重新rehash**
+**1- 为了进行计算元素在数组中位置时的与运算**
 
 **2- 为了均匀分布**
 
@@ -464,5 +484,104 @@ e = next;//e=next，但是这时next为空，所以要停止循环判断了
 
 
 
-## hashmap一些使用建议
+## ConcurrentHashMap
+
+### 1.7和1.8的区别？
+
+JDK1.7的 ConcurrentHashMap 底层采用 **分段的数组+链表** 实现，JDK1.8 采用的数据结构跟HashMap1.8的结构一样，数组+链表/红黑二叉树。Hashtable 和 JDK1.8 之前的 HashMap 的底层数据结构类似都是采用 **数组+链表** 的形式，数组是 HashMap 的主体，链表则是主要为了解决哈希冲突而存在的；
+
+
+
+**在JDK1.7的时候，ConcurrentHashMap（分段锁）** 对整个桶数组进行了分割分段(Segment)，每一把锁只锁容器其中一部分数据，多线程访问容器里不同数据段的数据，就不会存在锁竞争，提高并发访问率。
+
+**到了 JDK1.8 的时候已经摒弃了Segment的概念，而是直接用 Node 数组+链表+红黑树的数据结构来实现，并发控制使用 synchronized 和 CAS 来操作。**
+
+synchronized只锁定当前链表或红黑二叉树的首节点，这样只要hash不冲突，就不会产生并发，效率又提升N倍。
+
+**Hashtable(同一把锁)** :使用 synchronized 来保证线程安全，效率非常低下。当一个线程访问同步方法时，其他线程也访问同步方法，可能会进入阻塞或轮询状态，如使用 put 添加元素，另一个线程不能使用 put 添加元素，也不能使用 get，竞争会越来越激烈效率越低。
+
+### 1.7的实现
+
+**ConcurrentHashMap 是由 Segment 数组结构和 HashEntry 数组结构组成**。
+
+Segment 实现了 ReentrantLock,所以 Segment 是一种可重入锁，扮演锁的角色。HashEntry 用于存储键值对数据。
+
+```java
+static class Segment<K,V> extends ReentrantLock implements Serializable {
+}
+```
+
+### 1.8 
+
+1.8种大量使用了JUC.compareAndSwapXXX
+
+的方法，这个方法是利用一个CAS算法实现无锁化的修改值的操作，他可以大大降低锁代理的性能消耗
+
+### ConcurrentHashMap的get方法是否要加锁，为什么？
+
+不需要
+
+ 
+
+get操作可以无锁是由于Node的元素val和指针next是用volatile修饰的，在多线程环境下线程A修改结点的val或者新增节点的时候是对线程B可见的。和数组用volatile修饰没有关系。
+
+```java
+    static class Node<K,V> implements Map.Entry<K,V> {
+        final int hash;
+        final K key;
+        volatile V val;
+        volatile Node<K,V> next;
+```
+
+
+
+### ConcurrentHashMap的数组为啥使用volatile修饰？
+
+```java
+transient volatile Node<K,V>[] table;
+```
+
+我们知道volatile可以修饰数组的，只是意思和它表面上看起来的样子不同。举个栗子，volatile int array[10]是指array的地址是volatile的而不是数组元素的值是volatile的.
+
+### 为啥get的时候不采用table[index]?
+
+看其put操作，在读取table数组的时候，table数组是volatile的，但是，其使用了tabAt调用unsafe的getObjectVolatile方法，直接读取内存数据。
+
+那么问题来了：既然table数组是被volatile修饰的，那么为什么不直接table[index]读取呢？那么volatile修饰的数组能否保证数组内的元素的可见性呢？
+
+ 
+
+```csharp
+final V putVal(K key, V value, boolean onlyIfAbsent) {
+        if (key == null || value == null) throw new NullPointerException();
+        int hash = spread(key.hashCode());
+        int binCount = 0;
+        for (Node<K,V>[] tab = table;;) {
+            Node<K,V> f; int n, i, fh;
+            if (tab == null || (n = tab.length) == 0)
+                tab = initTable();
+            else if ((f = tabAt(tab, i = (n - 1) & hash)) == null) {
+                if (casTabAt(tab, i, null,
+                             new Node<K,V>(hash, key, value, null)))
+            。。。
+}
+static final <K,V> Node<K,V> tabAt(Node<K,V>[] tab, int i) {
+        return (Node<K,V>)U.getObjectVolatile(tab, ((long)i << ASHIFT) + ABASE);
+    }
+```
+
+
+
+当用一个局部变量，接收这个变量，然后主线程改变了volatile数组内的元素，另一个线程感知不到。
+ 原因是：局部变量接收了volatile数组，而局部变量没有volatile修饰（也不能用这个修饰），所以局部变量是不会去嗅探主存中这个table是否改变了的，所以感知不到。
+ 这个就是，currenthashmap中，为什么用unsafe去读内存中的数据，而不是table[index]的方式，因为，concurrenthashmap用了局部变量接收这个table。
+
+用局部变量接收volatile变量，是一种提高性能的方式，因为，每次都去感知，多少会消耗性能
+
+
+
+```
+下面是一些探讨volatile修饰数组的原因
+https://www.jianshu.com/p/10ef84dc5eef
+```
 

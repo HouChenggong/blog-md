@@ -1,19 +1,337 @@
-## 2. Synchronied
 
-### 1. 字节码层级
+
+## JVM8大原子操作
+
+`lock（加锁） read（读） load（加载） use（使用）   `
+
+`assign（赋值） store（存储） write（写入内存） unlock（释放锁）`
+
+必须是顺序执行
+
+ 先加锁、再读、然后把内容读到工作内存中、使用
+
+使用完了之后assign指派回去、然后strore存储，保存完了之后再写回去，最后释放锁
+
+##  使用synchronized的三种方式
+
+我们先看下平常我们使用到synchronized的几种方式
 
 ```java
-//监视
-monitorenter
-    //退出
-monitorexit
+public class TestThread {
+
+    public  Object o;
+    //锁住当前方法 flags: ACC_SYNCHRONIZED
+    synchronized void test() {
+
+    }
+	//锁住当前对象 monitorenter 、monitorexit 
+    void test2() {
+        synchronized (this) {
+
+        }
+    }
+	//锁住类  flags: ACC_STATIC ACC_SYNCHRONIZED
+	static synchronized void  test3(){
+
+	 }	
+	//锁住类  monitorenter 、monitorexit 
+     void test4(){
+        synchronized (TestThread.class){
+
+        }
+    }
+	//锁住Object对象 monitorenter 、monitorexit 
+    void test5(){
+        synchronized (o){
+
+        }
+    }
+}
 ```
 
-### 2. HotSpot层面
 
-同步方法和同步代码块底层都是通过monitor来实现同步的。
 
-两者的区别：同步方式是通过方法中的access_flags中设置ACC_SYNCHRONIZED标志来实现；同步代码块是通过monitorenter和monitorexit来实现
+### 1. 同步实例方法，锁住当前对象
+
+- **锁住当前对象的第一种方式**
+
+```java
+   synchronized void  test(){
+
+    }
+```
+
+下面是它的字节码：重要的是： `**flags: ACC_SYNCHRONIZED**`
+
+```java
+  synchronized void test();
+    descriptor: ()V
+    flags: ACC_SYNCHRONIZED
+    Code:
+      stack=0, locals=1, args_size=1
+         0: return
+      LineNumberTable:
+        line 11: 0
+
+```
+
+### 2. 同步类方法，锁住当前类
+
+```java
+static synchronized void  test3(){
+
+ }
+```
+
+下面的字节码如下： **`flags: ACC_STATIC`**
+
+```java
+  static synchronized void test3();
+    descriptor: ()V
+    flags: ACC_STATIC, ACC_SYNCHRONIZED
+    Code:
+      stack=0, locals=0, args_size=0
+         0: return
+      LineNumberTable:
+        line 22: 0
+
+```
+
+
+
+
+
+### 3.同步代码块，锁住代码块里面的对象
+
+- **锁住当前对：this关键字**
+
+```java
+    void test2() {
+        synchronized (this) {
+
+        }
+    }
+```
+
+下面是它的字节码，重要的是：**`monitorenter 、monitorexit`**
+
+```java
+ void test2();
+    descriptor: ()V
+    flags:
+    Code:
+      stack=2, locals=3, args_size=1
+         0: aload_0
+         1: dup
+         2: astore_1
+         3: monitorenter
+         4: aload_1
+         5: monitorexit
+         6: goto          14
+         9: astore_2
+        10: aload_1
+        11: monitorexit
+        12: aload_2
+        13: athrow
+        14: return
+
+```
+
+- **锁住括号里面的对象**
+
+
+
+```java
+public  Object o;
+void test5(){
+        synchronized (o){
+            
+        }
+}
+  void test5();
+    descriptor: ()V
+    flags:
+    Code:
+      stack=2, locals=3, args_size=1
+         0: aload_0
+         1: getfield      #3                  // Field o:Ljava/lang/Object;
+         4: dup
+         5: astore_1
+         6: monitorenter
+         7: aload_1
+         8: monitorexit
+         9: goto          17
+        12: astore_2
+        13: aload_1
+        14: monitorexit
+        15: aload_2
+        16: athrow
+        17: return
+
+```
+
+- **括号里面是静态对象**
+
+~~~java
+锁住当前类
+
+```java
+     void test4(){
+        synchronized (TestThread.class){
+
+        }
+    }
+```
+
+#### 
+
+```java
+  void test4();
+    descriptor: ()V
+    flags:
+    Code:
+      stack=2, locals=3, args_size=1
+         0: ldc           #2                  // class org/xiyou/leetcode/thread/TestThread
+         2: dup
+         3: astore_1
+         4: monitorenter
+         5: aload_1
+         6: monitorexit
+         7: goto          15
+        10: astore_2
+        11: aload_1
+        12: monitorexit
+        13: aload_2
+        14: athrow
+        15: return
+
+```
+~~~
+
+## synchronized底层实现原理
+
+### 1. 字节码层面
+
+一个是access_synchronized实现的，一个是monitorenter和monitorexit实现的
+
+
+
+### access_synchronized标识和monitor指令有什么区别?
+
+**access_synchronized:**    
+
+   方法级的同步是隐式的，即无需通过字节码指令来控制的，它实现在方法调用和返回操作之中。JVM 可以从方法常量池中的方法表结构中的ACC_SYNCHRONIZED访问标志区分一个方法是否同步方法。当方法调用时，调用指令将会 检查方法的ACC_SYNCHRONIZED访问标志是否被设置，如果设置了，执行线程将先持有monitor（虚拟机规范中用的是管程一词）， 然后再执行方法，最后在方法完成（无论是正常完成还是非正常完成）时释放monitor。在方法执行期间，执行线程持有了monitor，其他任何线程都无法再获得同一个monitor。如果一个同步方法执行期间抛出了异常，并且在方法内部无法处理此异常，那这个同步方法所持有的monitor将在异常抛到同步方法之外时自动释放
+
+**monitor指令：**
+
+每个对象都会与一个monitor相关联，当某个monitor被拥有之后就会被锁住，当线程执行到monitorenter指令时，就会去尝试获得对应的monitor。步骤如下：
+
+1. 每个monitor维护着一个记录着拥有次数的计数器。未被拥有的monitor的该计数器为0，当一个线程获得monitor（执行monitorenter）后，该计数器自增变为 1 。
+   - 当同一个线程再次获得该monitor的时候，计数器再次自增；
+   - 当不同线程想要获得该monitor的时候，就会被阻塞。
+2. 当同一个线程释放 monitor（执行monitorexit指令）的时候，计数器再自减。当计数器为0的时候。monitor将被释放，其他线程便可以获得monitor。
+
+
+
+### monitor什么时候才会被使用？
+
+答案：只有重量级锁才会被使用
+
+### Monitor与java对象以及线程是如何关联 
+
+
+
+1.如果一个java对象被某个线程锁住，则该java对象的Mark Word字段中LockWord指向monitor的起始地址
+
+2.Monitor的Owner字段会存放拥有相关联对象锁的线程id
+
+对象是如何跟monitor有关联的呢？
+一个Java对象在堆内存中包括对象头，对象头有Mark word，Mark word存储着锁状态，锁指针指向monitor地址
+
+监视器锁monitor底层依赖操作系统的MutexLock(互斥锁)实现，他是一个重量级锁
+
+涉及CPU内核状态的转换：用户态-内核态
+
+**monitor里面有什么？**
+
+count 记录加锁次数，实现可重入性
+
+owner 拥有者的线程
+
+waiters等待的线程数量
+
+waitSet 等待池
+
+ EntryList（锁池）
+
+
+
+下面证明下：access_synchronized是在常量池中的方法表结构中的
+
+1. **首先我们先明白access_synchronized是什么？**
+
+答案：是一个方法的属性和标志
+
+```java
+表4.6-A。方法访问和属性标志
+
+标志名称	值	解释
+ACC_PUBLIC	0x0001	宣布public; 可以从其程序包外部进行访问。
+ACC_PRIVATE	0x0002	宣布private; 仅在定义类中可访问。
+ACC_PROTECTED	0x0004	宣布protected; 可以在子类中访问。
+ACC_STATIC	0x0008	宣布static。
+ACC_FINAL	0x0010	宣布final; 不能被覆盖（第5.4.5节）。
+ACC_SYNCHRONIZED	0x0020	宣布synchronized; 调用由监视器使用来包装。
+ACC_BRIDGE	0x0040	编译器生成的桥接方法。
+ACC_VARARGS	0x0080	用可变数量的参数声明。
+ACC_NATIVE	0x0100	宣布native; 用Java以外的语言实现。
+ACC_ABSTRACT	0x0400	宣布abstract; 没有提供实现。
+ACC_STRICT	0x0800	宣布strictfp; 浮点模式受FP限制。
+ACC_SYNTHETIC	0x1000	宣布为合成；在源代码中不存在。
+```
+
+
+
+2. **我们首先看access_flags指定存在哪个位置？**
+
+   答案：method_info里面
+
+```java
+method_info {
+    u2             access_flags;
+    u2             name_index;
+    u2             descriptor_index;
+    u2             attributes_count;
+    attribute_info attributes[attributes_count];
+}
+```
+
+3. **我们再看method_Info存在哪个位置？**
+
+```java
+ClassFile {
+    u4             magic;
+    u2             minor_version;
+    u2             major_version;
+    u2             constant_pool_count;
+    cp_info        constant_pool[constant_pool_count-1];
+    u2             access_flags;
+    u2             this_class;
+    u2             super_class;
+    u2             interfaces_count;
+    u2             interfaces[interfaces_count];
+    u2             fields_count;
+    field_info     fields[fields_count];
+    u2             methods_count;
+    method_info    methods[methods_count];
+    u2             attributes_count;
+    attribute_info attributes[attributes_count];
+}
+```
+
+
+
+
 
  
 
@@ -112,11 +430,13 @@ public class CasOptimistic {
 
 所以synchronized 锁优化的过程和markword息息相关
 
+先检测是否是无锁状态，然后用CAS（基于汇编指令 cmp hxg）更新变成偏向锁
+
 markword中最低三位代表锁状态，第一位代表是否是偏向锁，2、3位代表锁标志位
 
 **无锁**：对象头里面存储当前对象的hashcode，即原来的Markword组成是：001+hashcode
 
-**偏向锁**：其实就是偏向一个用户，适用场景，只有几个线程，其中某个线程会经常访问，他就会往对象头里面添加线程id，就像在门上贴个纸条一样，占用当前线程，只要纸条存在，就可以一直用
+**偏向锁**：其实就是偏向一个用户，适用场景，只有几个线程，其中某个线程会经常访问，他就会往对象头里面添加线程id，就像在门上贴个纸条一样，占用当前线程，只要纸条存在，就可以一直用。 
 
 它的意思就是说，这个锁会偏向于第一个获得它的线程，在接下来的执行过程中，假如该锁没有被其他线程所获取，没有其他线程来竞争该锁，那么持有偏向锁的线程将永远不需要进行同步操作。
 
@@ -234,11 +554,6 @@ public void method(){
 
 ### 可重入性的实现
 
-每个对象都会与一个monitor相关联，当某个monitor被拥有之后就会被锁住，当线程执行到monitorenter指令时，就会去尝试获得对应的monitor。步骤如下：
+因此在一个线程调用`synchronized`方法的同时在其方法体内部调用该对象另一个`synchronized`方法，也就是说一个线程得到一个对象锁后再次请求该对象锁，是允许的，这就是`synchronized`的可重入性。
 
-1. 每个monitor维护着一个记录着拥有次数的计数器。未被拥有的monitor的该计数器为0，当一个线程获得monitor（执行monitorenter）后，该计数器自增变为 1 。
-   - 当同一个线程再次获得该monitor的时候，计数器再次自增；
-   - 当不同线程想要获得该monitor的时候，就会被阻塞。
-2. 当同一个线程释放 monitor（执行monitorexit指令）的时候，计数器再自减。当计数器为0的时候。monitor将被释放，其他线程便可以获得monitor。
-
- 
+ 需要特别注意另外一种情况，当子类继承父类时，子类也是可以通过可重入锁调用父类的同步方法。注意由于`synchronized`是基于`monitor`实现的，因此每次重入，`monitor`中的计数器仍会加 1。
