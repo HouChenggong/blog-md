@@ -14,9 +14,15 @@ public class User {
     private int age;
     private String sex;
 
+
+    public static   void  setA(User user){
+        User a=user;
+        a.setName("xxx");
+    }
     public static void main(String[] args) {
         List<User> list = new ArrayList<>();
         User user1 = new User("张三",15,"男");
+
         User user2 = new User("李四",22,"男");
         User user3 = new User("王五",25,"男");
         User user4 = new User("赵六",30,"男");
@@ -41,5 +47,9 @@ public class User {
                 .filter(user -> user.getAge()<30 && "女".equals(user.getSex())).count();
 
         System.out.println(list);
+
+        User user11 = new User("张三",15,"男");
+        setA(user11);
+        System.out.println(user11);
     }
 }

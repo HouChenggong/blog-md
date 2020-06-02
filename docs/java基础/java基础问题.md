@@ -247,6 +247,7 @@ public void consumer(){
 public final class String
     implements java.io.Serializable, Comparable<String>, CharSequence
 private final char value[];
+// Default to 0
 private int hash;  
 //String 重写了它的hash方法
 public int hashCode() {
@@ -701,6 +702,21 @@ hashcode有自己的一套算法，当然一个对象无论计算多少次，has
 ### 为什么 Java 中只有值传递？
 
 [为啥只有值传参](<https://blog.csdn.net/qq_39455116/article/details/83617271>)
+
+下面两种情况对user的修改都会影响到真实的数据值，为啥？
+
+引入对象指向的都是同一个指针
+
+```java
+    public static   void  setA(User user){
+        user.setName("xxx");
+    }   
+
+public static   void  setA(User user){
+        User a=user;
+        a.setName("xxx");
+    }
+```
 
 总结：
 

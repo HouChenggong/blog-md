@@ -1,5 +1,7 @@
 package org.xiyou.leetcode.thread.vola;
 
+import java.util.HashMap;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -11,6 +13,8 @@ import java.util.concurrent.TimeUnit;
  */
 public class TestVolatileArr {
     public static   int[] array = new int[10];
+    HashMap a;
+    ConcurrentHashMap map;
     public static void main(String[] args) {
         new Thread(() -> {  //线程A
             try {

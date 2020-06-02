@@ -484,7 +484,7 @@ e = next;//e=next，但是这时next为空，所以要停止循环判断了
 
 
 
-## ConcurrentHashMap
+## ConcurrentHashMap1.7
 
 ### 1.7和1.8的区别？
 
@@ -500,7 +500,9 @@ synchronized只锁定当前链表或红黑二叉树的首节点，这样只要ha
 
 **Hashtable(同一把锁)** :使用 synchronized 来保证线程安全，效率非常低下。当一个线程访问同步方法时，其他线程也访问同步方法，可能会进入阻塞或轮询状态，如使用 put 添加元素，另一个线程不能使用 put 添加元素，也不能使用 get，竞争会越来越激烈效率越低。
 
-### 1.7的实现
+## 1.7的具体实现
+
+https://blog.csdn.net/klordy_123/article/details/82933115
 
 **ConcurrentHashMap 是由 Segment 数组结构和 HashEntry 数组结构组成**。
 
@@ -511,13 +513,229 @@ static class Segment<K,V> extends ReentrantLock implements Serializable {
 }
 ```
 
+```java
+/**
+ * 默认的并发数量,会影响segments数组的长度(初始化后不能修改)
+ */
+static final int DEFAULT_CONCURRENCY_LEVEL = 16;
+```
+
+```java
+/**
+ * 每个segment中table数组的长度,必须是2^n,至少为2
+ */
+static final int MIN_SEGMENT_TABLE_CAPACITY = 2;
+```
+
+```java
+/**
+ * 非锁定情况下调用size和contains方法的重试次数,避免由于table连续被修改导致无限重试
+ */
+static final int RETRIES_BEFORE_LOCK = 2;
+//注意第一次不计入，所以算size和contains至少需要3次统计
+```
+
+
+
+### 1.结构：Segment+数组+链表
+
+Segment初始容量是16，所以并发度是16,但是segment不扩容，扩容的是table, 而且 创建segments并初始化第一个segment数组,其余的segment延迟初始化
+
+**为啥是16？**
+
+如果并发度设置的过小，会带来严重的锁竞争问题；如果并发度设置的过大，原本位于同一个Segment内的访问会扩散到不同的Segment中，CPU cache命中率会下降，从而引起程序性能下降。
+
+
+
+数组被称为table ，在三个参数默认的时候，table的长度是2,每次扩容2倍
+
+链表是由HashEntry组成的
+
+### 2.锁：分段锁继承ReetranLock 
+
+如果存在竞争，那么发生自旋、阻塞
+
+```java
+static final class Segment<K,V> extends ReentrantLock implements Serializable {
+    private static final long serialVersionUID = 2249069246763182397L;
+
+    /**
+     * 对segment加锁时,在阻塞之前自旋的次数
+     *
+     */
+    static final int MAX_SCAN_RETRIES =
+            Runtime.getRuntime().availableProcessors() > 1 ? 64 : 1;
+
+    /**
+     * 每个segment的HashEntry table数组,访问数组元素可以通过entryAt/setEntryAt提供的volatile语义来完成
+     * volatile保证可见性
+     */
+    transient volatile HashEntry<K,V>[] table;
+
+    /**
+     * 元素的数量,只能在锁中或者其他保证volatile可见性之间进行访问
+     */
+    transient int count;
+
+    /**
+     * 当前segment中可变操作发生的次数,put,remove等,可能会溢出32位
+     * 它为chm isEmpty() 和size()方法中的稳定性检查提供了足够的准确性.
+     * 只能在锁中或其他volatile读保证可见性之间进行访问
+     */
+    transient int modCount;
+
+    /**
+     * 当table大小超过阈值时,对table进行扩容,值为(int)(capacity *loadFactor)
+     */
+    transient int threshold;
+
+    /**
+     * 负载因子
+     */
+    final float loadFactor;
+
+    /**
+     * 构造方法
+     */
+    Segment(float lf, int threshold, HashEntry<K,V>[] tab) {
+        this.loadFactor = lf;
+        this.threshold = threshold;
+        this.table = tab;
+    }
+```
+
+
+
+### 3.get()方法高效因为volatile修饰 不需要加锁
+
+注意:get方法使用了getObjectVolatile方法读取segment和hashentry,保证是最新的,具有锁的语义,可见性
+分析:为什么get不加锁可以保证线程安全
+(1) 首先获取value,我们要先定位到segment,使用了UNSAFE的getObjectVolatile具有读的volatile语义,也就表示在多线程情况下,我们依旧能获取最新的segment.
+(2) 获取hashentry[],由于table是每个segment内部的成员变量,使用volatile修饰的,所以我们也能获取最新的table.
+(3) 然后我们获取具体的hashentry,也时使用了UNSAFE的getObjectVolatile具有读的volatile语义,然后遍历查找返回.
+(4) 总结我们发现怎个get过程中使用了大量的volatile关键字,其实就是保证了可见性(加锁也可以,但是降低了性能),get只是读取操作,所以我们只需要保证读取的是最新的数据即可.
+
+```java
+/**
+ * get 方法
+ */
+public V get(Object key) {
+    Segment<K,V> s; // manually integrate access methods to reduce overhead
+    HashEntry<K,V>[] tab;
+    int h = hash(key);
+    long u = (((h >>> segmentShift) & segmentMask) << SSHIFT) + SBASE; // 获取segment的位置
+    // getObjectVolatile getObjectVolatile语义读取最新的segment,获取table
+    if ((s = (Segment<K,V>)UNSAFE.getObjectVolatile(segments, u)) != null &&
+            (tab = s.table) != null) {
+        // getObjectVolatile getObjectVolatile语义读取最新的hashEntry,并遍历
+        for (HashEntry<K,V> e = (HashEntry<K,V>) UNSAFE.getObjectVolatile
+                (tab, ((long)(((tab.length - 1) & h)) << TSHIFT) + TBASE);
+             e != null; e = e.next) {
+            K k;
+            // 找到相同的key 返回
+            if ((k = e.key) == key || (e.hash == h && key.equals(k)))
+                return e.value;
+        }
+    }
+    return null;
+}
+```
+
+
+
+### 4.volatile修饰节点指针next
+
+### 5.HashEntry结构
+
+```java
+static final class HashEntry<K,V> {
+    // hash值
+    final int hash;
+    // key
+    final K key;
+    // 保证内存可见性,每次从内存中获取
+    volatile V value;
+    volatile HashEntry<K,V> next;
+
+    HashEntry(int hash, K key, V value, HashEntry<K,V> next) {
+        this.hash = hash;
+        this.key = key;
+        this.value = value;
+        this.next = next;
+    }
+
+    /**
+     * 使用volatile语义写入next,保证可见性
+     */
+    final void setNext(HashEntry<K,V> n) {
+        UNSAFE.putOrderedObject(this, nextOffset, n);
+    }
+```
+
+
+
+### 1.7 如何定位元素？
+
+一个元素肯定是在某一个Segment的某个数组上，所以
+
+1. **定位Segment**:得key的hashcode值进行一次再散列（通过Wang/Jenkins算法），拿到再散列值后，以再散列值的高位进行取模得到当前元素在哪个segment上。
+
+SegmentShift表示偏移位数，通过前面的int类型的位的描述我们可以得知，int类型的数字在变大的过程中，低位总是比高位先填满的，为保证元素在segment级别分布的尽量均匀，计算元素所在segment时，总是取hash值的高位进行计算。segmentMask作用就是为了利用位运算中取模的操作
+
+```java
+ // 定位segments 数组的位置
+    int j = (hash >>> segmentShift) & segmentMask;
+```
+
+```java
+
+//比如segment得长度是16，那么16=2^4，所以segmentShift=32-4=28
+h>>>segmentShift //可以理解为只取hash值得高几位,也就是高4位
+segmentMask//segment的长度-1，如果segment长度是16，那么segmentMask是15
+所以：
+    (h>>>segmentShift  & segmentMask)代表hash值得高几位^（数组长度-1）
+```
+
+
+
+1. **定位table**：同样是取得key的再散列值以后，用再散列值的全部和table的长度进行取模，得到当前元素在table的哪个元素上。
+
+```java
+((tab.length-1) & hash  << SSHIFT )+sbase
+```
+
+
+
+1. **定位链表:**定位segment和定位table后，依次扫描这个table元素下的的链表，要么找到元素，要么返回null。
+
+具体代码是：
+
+```
+private int hash(Object k){
+int h=hashSeed;
+if(o)
+}
+```
+
+### 1.7 put()必须加锁吗？
+
+put的时候先定位segement尝试对Segment进行加锁，加锁失败进入自旋
+
+### 1.7如何计算size?
+
+size的时候进行3次不加锁的统计，后2次计算结果和第一次一致直接返回结果，不一致，全部的segment重新加锁再次统计
+
+### 1.7是强一致性还是弱一致性？
+
+get方法和containsKey方法都是通过对链表遍历判断是否存在key相同的节点以及获得该节点的value。但由于遍历过程中其他线程可能对链表结构做了调整，因此get和containsKey返回的可能是过时的数据，这一点是ConcurrentHashMap在弱一致性上的体现。
+
 ### 1.8 
 
 1.8种大量使用了JUC.compareAndSwapXXX
 
 的方法，这个方法是利用一个CAS算法实现无锁化的修改值的操作，他可以大大降低锁代理的性能消耗
 
-### ConcurrentHashMap的get方法是否要加锁，为什么？
+### 1.7ConcurrentHashMap的get方法是否要加锁，为什么？
 
 不需要
 
