@@ -17,9 +17,10 @@
   
 * 设计模型
   * [工厂模式和抽象工厂模式](./docs/设计模式/工厂模式和抽象工厂模式.md)
+  * [代理模式-动态代理](./docs/springboot/动态代理.md)
   * [框架中用的设计模式](./docs/设计模式/框架中的设计模式.md)
-  * [模板模式](./docs/设计模式/模板模式.md)
-
+* [模板模式](./docs/设计模式/模板模式.md)
+  
 * 多线程
   * [Java写一个死锁](./docs/多线程/java写一个死锁.md)
   * [AQS和JUC](./docs/多线程/AQS.md)
@@ -32,6 +33,10 @@
 
 * spring
   * [springIOC和循环依赖](./docs/springboot/springIoc.md)
+  * [spring注解全系列](./docs/springboot/spring注解.md)
+  * [利用动态代理来手写AOP](./docs/springboot/利用JDK动态代理手写AOP.md)
+  * [RPC和动态代理](./docs/springboot/RPC和动态代理.md)
+  * 
   * [spring事务](./docs/springboot/spring事务.md)
   * [spring事务失效的几种情况](./docs/springboot/spring事务注解失效的几种情况.md)
   * [测试事务的传播行为](./docs/springboot/测试事务传播行为.md)
