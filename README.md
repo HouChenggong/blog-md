@@ -47,6 +47,14 @@ Usage: docsify <init|serve> <path>
 
 即可访问
 
+### 如何加快访问速度
+
+```html
+unpkg.com替换为unpkg.zhimg.com
+```
+
+这个是非常有必要的，因为unpkg.com是国外的，另一个是国内的镜像
+
 ## 在线阅读
 
 - 国内快速阅读地址：https://cnxiyou.gitee.io/blog-md/

@@ -34,12 +34,18 @@
         // 搜索标题的最大程级, 1 - 6
         depth: 3,
       },
+      pagination: {
+        previousText: '上一章节',
+        nextText: '下一章节',
+      },
       plugins: [
         EditOnGithubPlugin.create('https://github.com/HouChenggong/blog-md/master/')
       ],
     }
   </script>
   <script src="//unpkg.zhimg.com/docsify/lib/docsify.min.js"></script>
+    <script src="//unpkg.zhimg.com/docsify-pagination/dist/docsify-pagination.min.js"></script>
+ 
   <!--Java代码高亮-->
   <script src="//unpkg.zhimg.com/prismjs/components/prism-java.js"></script>
   <!--全文搜索,直接用官方提供的无法生效-->
