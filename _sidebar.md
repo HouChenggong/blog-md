@@ -18,10 +18,12 @@
   
 * 设计模型
   
-  * [单例模式](./docs/单例模式/单例模式.md)
-  * [工厂模式和抽象工厂模式](./docs/设计模式/工厂模式和抽象工厂模式.md)
-  * [建造者模式](./docs/设计模式/建造者模式.md)
-  * [策略模式](./docs/设计模式/策略模式.md)
+  * [单例模式-创建型](./docs/单例模式/单例模式.md)
+  * [原型模式-创建型](./docs/设计模式/原型模式.md)
+  * [工厂模式和抽象工厂模式-创建型](./docs/设计模式/工厂模式和抽象工厂模式.md)
+  * [建造者模式-创建型](./docs/设计模式/建造者模式.md)
+  * [策略模式-行为型](./docs/设计模式/策略模式.md)
+  * [观察者模式-行为型](./docs/设计模式/观察者模式.md)
   * [代理模式-动态代理](./docs/springboot/动态代理.md)
   * [框架中用的设计模式](./docs/设计模式/框架中的设计模式.md)
   
@@ -42,32 +44,26 @@
   * [spring注解全系列](./docs/springboot/spring注解.md)
   * [利用动态代理来手写AOP](./docs/springboot/利用JDK动态代理手写AOP.md)
   * [RPC和动态代理](./docs/springboot/RPC和动态代理.md)
-  * 
   * [spring事务](./docs/springboot/spring事务.md)
   * [spring事务失效的几种情况](./docs/springboot/spring事务注解失效的几种情况.md)
   * [测试事务的传播行为](./docs/springboot/测试事务传播行为.md)
-  
 * [mysql](./docs/mysql/mysql系列.md)
-
 * 分布式
 
   - [redis基础](./docs/redis/redis使用场景.md)
   
   - [redis层层深入剖析分布式锁](./docs/秒杀相关/分布式锁/1用redis实现分布式锁.md)
-  
 * 算法
 
   - [基础算法](./docs/算法/基础算法.md)
   - [常用套路](./docs/算法总结.md)
-
 * 秒杀相关
   - [限流](./docs/秒杀相关/限流/限流.md)
   - 
-  
 * [每日学习记录](./docs/每日学习记录.md)
-
 * [常用英文词汇](./docs/常用英文词汇.md)
-
+* dubbo与springCloud
+  - [dubbo](./docs/springCloud和dubbo/dubbo.md)
 * 其它
   * [一字型hash算法](./docs/其它/一致性hash算法.md)
   * [easyExcel动态多表头](./docs/其它/easyExcel动态多表头.md)
