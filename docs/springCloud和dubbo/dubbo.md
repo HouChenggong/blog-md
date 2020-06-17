@@ -107,6 +107,14 @@ zookeeper 、redis、Multicast、Nacos、Simple
 - XML, XML中的当前配置会重写dubbo.properties中的；
 - Properties，默认配置，仅仅作用于以上两者没有配置时。
 
+### dubbo 启动检查
+
+Dubbo 缺省会在启动时检查依赖的服务是否可用，不可用时会抛出异常，阻止 Spring 初始化完成，以便上线时，能及早发现问题，默认 `check="true"`。
+
+可以通过 `check="false"` 关闭检查，比如，测试时，有些服务不关心，或者出现了循环依赖，必须有一方先启动。
+
+另外，如果你的 Spring 容器是懒加载的，或者通过 API 编程延迟引用服务，请关闭 check，否则服务临时不可用时，会抛出异常，拿到 null 引用，如果 `check="false"`，总是会返回引用，当服务恢复时，能自动连上。
+
 ### 如何直连
 
 - -D
@@ -321,3 +329,6 @@ cpu个数 + 1
 ### 自动剔除什么原理
 
 zookeeper临时节点，会话保持原理。
+
+
+

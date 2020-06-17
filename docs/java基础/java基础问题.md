@@ -379,7 +379,13 @@ a = a + "b";
 
 ```java
 String a="a";
-a=StringBuilder.append(a).append(b);
+a=StringBuilder.append(a).append(b).toString();
+//下面是StringBuiler的toString方法
+public String toString() {
+  // Create a copy, don't share the array
+  return new String(value, 0, count);
+}
+所以创建了3个对象，因为String a是一个；StringBuilder是一个；toString的时候创建了1个，所以是3个
 ```
 
 
@@ -458,8 +464,6 @@ public static String join(CharSequence delimiter, CharSequence... elements) {
 
 StringJoiner源码：内部是用StringBuilder进行拼接的
 
-
-
 ```java
 public final class StringJoiner {
 //前缀
@@ -526,6 +530,18 @@ private StringBuilder prepareBuilder() {
     }
 ```
 
+#### String.intern()
+
+把结果保存到原空间，只有调用的时候才会去存储
+
+```
+String a="xxx";//会存储到元空间
+String b=new String("xxx1");//不会存储到元空间，再堆中存储
+b.intern();//会把b的string类型存储到元空间
+```
+
+
+
 ### StringBuffer与StringBuilder
 
 
@@ -582,6 +598,71 @@ String 中的对象是不可变的，也就可以理解为常量，线程安全�
 1. 操作少量的数据: 适用 String
 2. 单线程操作字符串缓冲区下操作大量数据: 适用 StringBuilder
 3. 多线程操作字符串缓冲区下操作大量数据: 适用 StringBuffer
+
+
+
+### StringBuffer和StringBuilder的扩容问题？
+
+### StringBuilder 和 StringBuffer 的扩容问题
+
+我相信这个问题很多同学都没有注意到吧，其实 StringBuilder 和 StringBuffer 存在扩容问题，先从 StringBuilder 开始看起
+
+首先先注意一下 StringBuilder 的初始容量
+
+```
+public StringBuilder() {
+  super(16);
+}
+```
+
+StringBuilder 的初始容量是 16，当然也可以指定 StringBuilder 的初始容量。
+
+在调用 append 拼接字符串，会调用 AbstractStringBuilder 中的 append 方法
+
+```java
+public AbstractStringBuilder append(String str) {
+  if (str == null)
+    return appendNull();
+  int len = str.length();
+  ensureCapacityInternal(count + len);
+  str.getChars(0, len, value, count);
+  count += len;
+  return this;
+}
+```
+
+上面代码中有一个 `ensureCapacityInternal` 方法，这个就是扩容方法，我们跟进去看一下
+
+```java
+private void ensureCapacityInternal(int minimumCapacity) {
+  // overflow-conscious code
+  if (minimumCapacity - value.length > 0) {
+    value = Arrays.copyOf(value,
+                          newCapacity(minimumCapacity));
+  }
+}
+```
+
+这个方法会进行判断，minimumCapacity 就是字符长度 + 要拼接的字符串长度，如果拼接后的字符串要比当前字符长度大的话，会进行数据的复制，真正扩容的方法是在 `newCapacity` 中
+
+```java
+private int newCapacity(int minCapacity) {
+  // overflow-conscious code
+  int newCapacity = (value.length << 1) + 2;
+  if (newCapacity - minCapacity < 0) {
+    newCapacity = minCapacity;
+  }
+  return (newCapacity <= 0 || MAX_ARRAY_SIZE - newCapacity < 0)
+    ? hugeCapacity(minCapacity)
+    : newCapacity;
+}
+```
+
+扩容后的字符串长度会是原字符串长度增加一倍 + 2，如果扩容后的长度还比拼接后的字符串长度小的话，那就直接扩容到它需要的长度  newCapacity = minCapacity，然后再进行数组的拷贝。
+
+### 为啥不推荐在循环里面用+
+
+每次都会创建一个 StringBuilder ，并把引用赋给 StringBuilder 对象，因此每个 StringBuilder 对象都是`强引用`， 这样在创建完毕后，内存中就会多了很多 StringBuilder 的无用对象。
 
 ## hashcode equals 
 ### == 与 equals的区别
@@ -769,6 +850,7 @@ final 关键字主要用在三个地方：变量、方法、类。
 
 1. 对于一个 final 变量，如果是基本数据类型的变量，则其数值一旦在初始化之后便不能更改；如果是引用类型的变量，则在对其初始化之后便不能再让其指向另一个对象。
 2. 当用 final 修饰一个类时，表明这个类不能被继承。final 类中的所有成员方法都会被隐式地指定为 final 方法。
+3. 当final修饰方法时，方法不能被重写
 
 ### this 关键字
 

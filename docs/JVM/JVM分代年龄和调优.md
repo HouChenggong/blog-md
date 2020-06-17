@@ -2,7 +2,7 @@
 
 GC Root 可以作为根的是：本地变量、静态变量、本地方法栈等
 
-![](E:\2020\code\springboot_dubbo\tools\md\JVM\img\堆的分代.png)
+![](.\img\堆的分代.png)
 
 ## minor GC
 

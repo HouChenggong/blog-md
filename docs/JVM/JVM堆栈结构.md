@@ -2,7 +2,7 @@
 
 ### JDK组成
 
-![](E:\2020\code\springboot_dubbo\tools\md\JVM\img\jdk组成.png)
+![](.\img\jdk组成.png)
 
 JRE包括HotSpotVm  
 
@@ -10,7 +10,7 @@ JDK包括JRE  、一些命令行、一些工具
 
 ### jVM组成
 
-![](E:\2020\code\springboot_dubbo\tools\md\JVM\img\栈和栈帧.png)
+ ![](./img/栈和栈帧.png)
 
 ```java
 public class A {

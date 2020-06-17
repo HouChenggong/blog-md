@@ -147,6 +147,10 @@ class User {
 
 # 原理
 
+[一个很棒的讲解](https://mp.weixin.qq.com/s/XvTV3VuEn94i9ApJFPA2hA)
+
+
+
 在Thread类内部有有ThreadLocal.ThreadLocalMap threadLocals = null;这个变量，它用于存储ThreadLocal，因为在同一个线程当中可以有多个ThreadLocal，并且多次调用get()所以需要在内部维护一个ThreadLocalMap用来存储多个ThreadLocal
 
 
@@ -173,7 +177,23 @@ public class ThreadLocal<T> {
   }
 ```
 
- ![](https://mmbiz.qpic.cn/mmbiz/JfTPiahTHJhrVezdFpPKZc0c9UXiaicr0UKBaYWeQDhoVZcFLq37TpaT4ibPdCbs21fMkqvUAnXGTTMSEj7wuRGpsw/640?wx_fmt=other&tp=webp&wxfrom=5&wx_lazy=1&wx_co=1)
+ `Thread`类有一个类型为`ThreadLocal.ThreadLocalMap`的实例变量`threadLocals`，也就是说每个线程有一个自己的`ThreadLocalMap`。
+
+`ThreadLocalMap`有自己的独立实现，可以简单地将它的`key`视作`ThreadLocal`，`value`为代码中放入的值（实际上`key`并不是`ThreadLocal`本身，而是它的一个**弱引用**）。
+
+每个线程在往`ThreadLocal`里放值的时候，都会往自己的`ThreadLocalMap`里存，读也是以`ThreadLocal`作为引用，在自己的`map`里找对应的`key`，从而实现了**线程隔离**。
+
+`ThreadLocalMap`有点类似`HashMap`的结构，只是`HashMap`是由**数组+链表**实现的，而`ThreadLocalMap`中并没有**链表**结构。
+
+我们还要注意`Entry`， 它的`key`是`ThreadLocal<?> k` ，继承自`WeakReference`， 也就是我们常说的弱引用类型。
+
+
+
+![](https://mmbiz.qpic.cn/mmbiz/JfTPiahTHJhrVezdFpPKZc0c9UXiaicr0UKBaYWeQDhoVZcFLq37TpaT4ibPdCbs21fMkqvUAnXGTTMSEj7wuRGpsw/640?wx_fmt=other&tp=webp&wxfrom=5&wx_lazy=1&wx_co=1)
+
+![](./img/threadLocal.jpg)
+
+
 
 ### 3 ThreadLocal相关方法
 
