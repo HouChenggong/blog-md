@@ -4,12 +4,17 @@ public class TestThread {
 
     public  Object o;
     synchronized void test() {
-
+        try {
+            o.wait();
+           boolean flag= Thread.holdsLock(o);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
     }
 
     void test2() {
         synchronized (this) {
-
+         o.notify();
         }
     }
 

@@ -31,6 +31,9 @@
 * [模板模式](./docs/设计模式/模板模式.md)
   
 * 多线程
+  
+  * [多线程基础](./docs/多线程/多线程基础.md)
+  * [线程池](./docs/多线程/线程池.md)
   * [Java写一个死锁](./docs/多线程/java写一个死锁.md)
   * [AQS和JUC](./docs/多线程/AQS.md)
   * [一个对象在内存的存储](./)
@@ -50,10 +53,8 @@
   * [测试事务的传播行为](./docs/springboot/测试事务传播行为.md)
 * [mysql](./docs/mysql/mysql系列.md)
 * 分布式
-
   - [redis基础](./docs/redis/redis使用场景.md)
-  
-  - [redis层层深入剖析分布式锁](./docs/秒杀相关/分布式锁/1用redis实现分布式锁.md)
+  - [分布式锁](./docs/秒杀相关/分布式锁/分布式锁.md)
 * 算法
 
   - [基础算法](./docs/算法/基础算法.md)

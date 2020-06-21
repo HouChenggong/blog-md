@@ -1,3 +1,9 @@
+## redis使用规范
+
+[参考链接](https://mp.weixin.qq.com/s/JRLAh8bVPUh7LNw6jmh2-w)
+
+
+
 # redis 使用场景
 
 - 缓存
