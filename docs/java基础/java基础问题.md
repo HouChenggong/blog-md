@@ -241,6 +241,91 @@ public void consumer(){
 
 ## String 
 
+### string常见小功能
+
+- 判断是否为空
+
+Apache 的 commons-lang3 包，有各式各样判空的方法。更重要的是，可以省却判 null 的操作，因为 StringUtils 的所有方法都是 null 安全的。
+
+```java
+import org.apache.commons.lang3.StringUtils;
+StringUtils.isBlank(" ");
+StringUtils.isNotBlank(" ");
+```
+
+- 裁剪字符串
+
+```java
+   public static String removeLastChar(String s) {
+        return (s == null || s.length() == 0)
+                ? null
+                : (s.substring(0, s.length() - 1));
+    }
+```
+
+- 裁剪推荐写法（安全）
+
+```java
+String s = "x x";
+StringUtils.substring(s, 0, s.length() - 1);
+```
+
+- 删除最后一个字符（安全）
+
+```java
+s=   StringUtils.chop(s);
+```
+
+- 替换字符串（null非安全）
+
+```java
+String all=null;
+all=all.replaceAll("=","x");
+//所以要判断是否是null
+String result= (s == null) ? null : s.replaceAll(".$", "");
+```
+
+- 替换字符串推荐写法lambda和Optional
+
+```java
+        String s1="";
+        String result1 = Optional.ofNullable(s1)
+                .map(str -> str.replaceAll(".$", ""))
+                .orElse(s);
+```
+
+- 统计字符串出现的次数
+
+```java
+long count = someString.chars().filter(ch -> ch == 'e').count();
+//或者使用工具类
+int count2 = StringUtils.countMatches("xxxxeee", "e");
+```
+
+- 拆分字符串
+
+```
+String[] splitted = "aaa，bbb".split("，");
+//但是上面的null不安全的，所有也可以用一些工具类
+String[] splitted = StringUtils.split("a a a，vvv", "，");
+```
+
+
+
+### 随机字符串
+
+```java
+int length = 6;
+boolean useLetters = true;
+// 不使用数字
+boolean useNumbers = false;
+String generatedString = RandomStringUtils.random(length, useLetters, useNumbers);
+
+System.out.println(generatedString);
+```
+
+但是不推荐这样用做系统ID相关的，还是推荐分布式ID
+
 **String 源码**
 
 ```java
@@ -427,6 +512,27 @@ public static String join(CharSequence delimiter, CharSequence... elements) {
 ```
 
 发现底层用的是StringJoiner对象里面的add()方法
+
+- 实际使用，可以说数组或者说list、set等
+
+```java
+String mutiXi[] = new String[]{"1", "2", "3"};
+String str2 = String.join("-", mutiXi);
+System.out.println(str2);
+//1-2-3
+```
+
+```java
+Set<String> set = new HashSet<>();
+set.add("java");
+set.add("c");
+set.add("javaSricpt");
+String s = String.join(",", set);
+System.out.println(s);
+//c,xjava,javaSricpt
+```
+
+
 
 #### 4.concat()
 
@@ -1680,6 +1786,37 @@ public static void test44(){
 
 相反，如果没有使用双亲委派模型，由各个类加载器自行去加载的话，如果用户自己编写了一个称为 java.lang.Object 的类，并放在 classpath 下，那么系统将会出现多个不同的 Object 类，Java 类型体系中最基础的行为也就无法保证。
 
+
+### 正则表达式
+#### 正则预编译
+
+- 在使用正则表达式时，利用好其预编译功能，可以有效加快正则匹配速度。 说明：不要在方法体内定义：Pattern pattern = Pattern.compile(规则);
+
+```java
+ public class XxxClass {
+        // Use precompile
+        private static Pattern NUMBER_PATTERN = Pattern.compile("[0-9]+");
+        public Pattern getNumberPattern() {
+            // Avoid use Pattern.compile in method body.
+            Pattern localPattern = Pattern.compile("[0-9]+");
+            return localPattern;
+        }
+    }
+```
+
+#### 正则表达式栈溢出
+
+通过观察，我们知道这是一个虚拟机 **栈溢出** 错误。
+
+Java语言中每个线程（Thread）的栈大小是有限制的，每一次函数调用都会生成一个栈帧（Frame），占用一定的栈空间，当栈空间被消耗完虚拟机就会报出StackOverflowError。
+
+再仔细地观察，发现栈信息中显示调用层次非常多，而且类名与代码行重复出现，这意味着栈帧是由递归调用产生的。
+
+到这里，问题发生的原因己经基本可以确定了。
+
+**在Java中正则表达式的产生了递归调用，而传入的长Json字符串导致函数调用层次太多，超过虚拟机预设的栈空间，因此，出现了StackOverflowError。**
+
+[区分json风格的字符串导致的栈溢出](https://www.jianshu.com/p/87d0175e1aed)
 ### 线程
 
 线程创建之后它将处于 **NEW（新建）** 状态，调用 `start()` 方法后开始运行，线程这时候处于 **READY（可运行）** 状态。可运行状态的线程获得了 cpu 时间片（timeslice）后就处于 **RUNNING（运行）** 状态。

@@ -2,11 +2,11 @@ MySQL事务
 
 #  ACID 
 
-![](E:\2020\code\springboot_dubbo\tools\md\mysql\img\ACID.png)
+![](.\img\ACID.png)
 
 ## 1、redo log 和undo log
 
- ![](E:\2020\code\springboot_dubbo\tools\md\mysql\img\原子性实现undolog.png)
+ ![](.\img\原子性实现undolog.png)
 
 #### 正常事务的执行流程
 
@@ -14,8 +14,8 @@ MySQL事务
 
 ```css
 1. 事务A 开始
-2. undo 记录原来的值1，也可以理解为update set age=1 where id =1
-3.执行update语句
+2. undo 复制记录undo log中记录原来的值1，也可以理解为update set age=1 where id =1
+3.执行update语句，相当于又创建了一个记录，同时把roll指针指向原来的记录的trx_id上
 4.记录redo log age=2
 5. 将redo log 写入磁盘
 6. 事务提交，将数据写入磁盘

@@ -1,6 +1,8 @@
 package org.xiyou.leetcode.thread;
 
 import java.lang.reflect.Field;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * @author xiyouyan
@@ -17,6 +19,8 @@ public class ThreadLocalDemo {
         Thread t2 = new Thread(() -> test("2222222222222222", true));
         t2.start();
         t2.join();
+
+
     }
 
     private static void test(String s,boolean isGC)  {

@@ -377,7 +377,47 @@ Java1.8相比1.7做了调整，1.7做了四次移位和四次异或，但明显J
 
 ### 为啥是0.75？
 
-0.75是平衡了时间和空间等因素； 负载因子越小桶的数量越多，读写的时间复杂度越低（极限情况O(1), 哈希碰撞的可能性越小）； 负载因子越大桶的数量越少，读写的时间复杂度越高(极限情况O(n), 哈希碰撞可能性越高)。 0.1，0.9，2，3等都是合法值。
+ 
+
+加载因子就是表示Hash表中元素的填满程度。
+
+> 加载因子 = 填入表中的元素个数 / 散列表的长度
+
+- 加载因子越大，填满的元素越多，空间利用率越高，但发生冲突的机会变大了；
+
+- 加载因子越小，填满的元素越少，冲突发生的机会减小，但空间浪费了更多了，而且还会提高扩容rehash操作的次数。
+- 因此，必须在“冲突的机会”与“空间利用率”之间，寻找一种平衡与折衷。
+
+
+
+那为啥刷0.75，而不是0.8或者0.9呢？
+
+那么为什么选择了0.75作为HashMap的加载因子呢？这个跟一个统计学里很重要的原理——泊松分布有关。
+
+泊松分布是统计学和概率学常见的离散概率分布，适用于描述单位时间内随机事件发生的次数的概率分布
+
+```java
+* Ideally, under random hashCodes, the frequency of
+* nodes in bins follows a Poisson distribution
+* (http://en.wikipedia.org/wiki/Poisson_distribution) with a
+* parameter of about 0.5 on average for the default resizing
+* threshold of 0.75, although with a large variance because of
+* resizing granularity. Ignoring variance, the expected
+* occurrences of list size k are (exp(-0.5) * pow(0.5, k) /
+* factorial(k)). The first values are:
+* 0:    0.60653066
+* 1:    0.30326533
+* 2:    0.07581633
+* 3:    0.01263606
+* 4:    0.00157952
+* 5:    0.00015795
+* 6:    0.00001316
+* 7:    0.00000094
+* 8:    0.00000006
+* more: less than 1 in ten million
+```
+
+计算结果如上述的列表所示，当一个bin中的链表长度达到8个元素的时候，概率为0.00000006，几乎是一个不可能事件。
 
 ### 什么指标影响hashmap效率？
 
