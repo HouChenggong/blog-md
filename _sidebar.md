@@ -15,7 +15,7 @@
   * [HashMap](./docs/java常用数据结构/hashmap.md)
   * [Tree](./docs/java常用数据结构/树.md)
   * [链表](./docs/算法/链表相关算法.md)
-  
+  * [手写最大、小堆、优先队列](./docs/java常用数据结构/优先队列.md)
 * 设计模型
   
   * [单例模式-创建型](./docs/单例模式/单例模式.md)
