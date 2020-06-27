@@ -102,3 +102,35 @@ Java VisualVM安装 Visual GC
 
 1. 年轻代内存调大些，保证第二次monitorGC的时候，前一次没有被清理的对象被标记为垃圾对象
 
+## 排查问题
+
+### 1.频繁FULL GC
+
+- 内存泄漏
+- 死循环
+- 大对象（大部分是它）
+  - 比如一次查询的结果集太大
+  - RPC传输大对象，比如一个巨型数组
+  - 单个数组对象太大
+
+#### 结果集和传输数据过大
+
+- 数据库查询的时候限制一下大小，或者给SQL查询的时候添加必要条件
+- 特别是mybatis的条件拼接
+
+```java
+select * from user where 1=1 
+<if test=" orderID != null ">and order_id = #{orderID}</if >
+```
+
+上面如果orderID为空，会导致查询全部
+
+#### 内存泄漏
+
+其实就是在每天程序跑的时候，定时或者在内存比较大的时候dump进行分析
+
+```java
+						可选。 				 	文件名 					 pid
+jmap -dump:live,format=b,file=myjmapfile.txt 19570
+```
+
