@@ -51,7 +51,10 @@
   * [spring事务](./docs/springboot/spring事务.md)
   * [spring事务失效的几种情况](./docs/springboot/spring事务注解失效的几种情况.md)
   * [测试事务的传播行为](./docs/springboot/测试事务传播行为.md)
-* [mysql](./docs/mysql/mysql系列.md)
+* [MySql]
+  * [mysql基础](./docs/mysql/mysql系列.md)
+  * [mysql一些问题](./docs/mysql/btree.md)
+
 * 分布式
   - [redis基础](./docs/redis/redis使用场景.md)
   - [分布式锁](./docs/秒杀相关/分布式锁/分布式锁.md)
