@@ -1,3 +1,43 @@
+## 从lock开始说AQS
+
+### LOCK怎么起到锁的作用的呢？
+
+如果你熟悉 synchronized，你知道程序编译成 CPU 指令后，在临界区会有 `moniterenter` 和 `moniterexit` 指令的出现，可以理解成进出临界区的标识
+
+从范式上来看：
+
+- `lock.lock()` 获取锁，“等同于” synchronized 的 moniterenter指令
+- `lock.unlock()` 释放锁，“等同于” synchronized 的 moniterexit 指令
+
+那 Lock 是怎么做到的呢？
+
+> 其实很简单，比如在  ReentrantLock 内部维护了一个 volatile 修饰的变量 state，通过 CAS 来进行读写（最底层还是交给硬件来保证原子性和可见性），如果CAS更改成功，即获取到锁，线程进入到 try 代码块继续执行；如果没有更改成功，线程会被【挂起】，不会向下执行
+
+但 Lock 是一个接口，里面根本没有 state 这个变量的存在：其实主要看ReentrantLock的实现,我们来看下它的源码,发现它只是实现了lock接口，但是内部有一个Sync对象，而Sync对象是继承了AQS，所以要学习Lock还是要学习AQS
+
+```java
+public class ReentrantLock implements Lock, java.io.Serializable {
+    private final Sync sync;
+
+    abstract static class Sync extends AbstractQueuedSynchronizer {
+```
+
+### 为啥要看AQS源码？
+
+![](./img/aqs.png)
+
+相信看到这个截图你就明白一二了，你听过的，面试常被问起的，工作中常用的
+
+- `ReentrantLock`
+- `ReentrantReadWriteLock`
+- `Semaphore(信号量)`
+- `CountDownLatch`
+- `公平锁`
+- `非公平锁`
+- `ThreadPoolExecutor` (关于线程池的理解，可以查看 为什么要使用线程池? )
+
+都和 AQS 有直接关系，所以了解 AQS 的抽象实现，在此基础上再稍稍查看上述各类的实现细节，很快就可以全部搞定，不至于查看源码时一头雾水，丢失主线
+
 ## JUC 
 
 ```java
@@ -6,74 +46,13 @@ package java.util.concurrent;包下面的
 
 ![](./img/juc的实现.png)
 
-
-
-
-
-### Exchanger
+## AQS同步器
 
 package java.util.concurrent;包下面的Exchanger
 
-Exchanger可以用于遗传算法，遗传算法里需要选出两个人作为交配对象，这时候会交换 
+Exchanger可以
 
-两人的数据，并使用交叉规则得出2个交配结果。Exchanger也可以用于校对工作，比如我们需 
-
-要将纸制银行流水通过人工的方式录入成电子银行流水，为了避免错误，采用AB岗两人进行 
-
-录入，录入到Excel之后，系统需要加载这两个Excel，并对两个Excel数据进行校对，看看是否 
-
-录入一致，代码如代码清单8-8所示。 
-
-exchanger你可以把它想象成一个容器， 这个容器有两个值，两个线程，有两个格的位置，第一个线程执行到exchanger exchange的时候，阻塞， 但是要注意我这个exchange方法的时候是往里面扔了一个值，你可以认为吧T1扔到第一个格子了， 然后第二个线程开始执行，也执行到这句话了，exchange,他把自己的这个值T2扔到第二个格子里。接下来这两个哥们儿交换一下，T1扔给T2，T2扔给T1， 两个线程继续往前跑。
-
-
-
-exchange只能是两个线程之间，交换这个东西只能两两进行。
-
-```java
-import java.util.concurrent.Exchanger;
-
-/**
- * @author xiyou
- * @version 1.0
- * xiyou-todo Exchanger
- * https://mp.weixin.qq.com/s/aYfUlwxxW9jm2tStcuIN7g
- * 只能两个线程互相交换
- * @date 2020/5/10 20:48
- */
-public class T12_TestExchanger {
-    static Exchanger<String> exchanger = new Exchanger<>();
-
-    public static void main(String[] args) {
-        new Thread(() -> {
-            String s = "T1";
-            try {
-                s = exchanger.exchange(s);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
-            System.out.println(Thread.currentThread().getName() + " " + s);
-
-        }, "t1").start();
-
-
-        new Thread(() -> {
-            String s = "T2";
-            try {
-                s = exchanger.exchange(s);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
-            System.out.println(Thread.currentThread().getName() + " " + s);
-
-        }, "t2").start();
-
-
-    }
-}
-```
-
-## AQS同步器
+exchange只能是两个线程之间，交换这个东西只能两两进行。AQS同步器
 
 **[一篇介绍的AQS的博文](https://www.jianshu.com/p/a8d27ba5db49)**
 
@@ -83,6 +62,72 @@ package java.util.concurrent.locks;包下面的AQS：AbstractQuenedSynchronizer
 
 AQS：AbstractQuenedSynchronizer抽象的队列式同步器。是除了java自带的synchronized关键字之外的锁机制。
 AQS的全称为（AbstractQueuedSynchronizer），这个类在java.util.concurrent.locks包
+
+```java
+public abstract class AbstractQueuedSynchronizer
+    extends AbstractOwnableSynchronizer
+ 
+    private transient volatile Node head;
+
+    private transient volatile Node tail;
+
+    private volatile int state;
+```
+
+而每一个Node都有一个p rev和一个next说明，node是一个双向链表
+
+```java
+static final class Node {
+    /**
+     * Marker to indicate a node is waiting in shared mode
+     */
+    static final Node SHARED = new Node();
+    /**
+     * Marker to indicate a node is waiting in exclusive mode
+     */
+    static final Node EXCLUSIVE = null;
+    //取消
+    static final int CANCELLED = 1;
+    //等待触发
+    static final int SIGNAL = -1;
+    //等待条件
+    static final int CONDITION = -2;
+    //状态需要向后传播
+    static final int PROPAGATE = -3;
+
+    volatile int waitStatus;
+    volatile Node prev;
+    volatile Node next;
+    volatile Thread thread;
+    Node nextWaiter;
+}
+```
+
+
+
+但是发现AQS也是继承了一个类，叫AbstractOwnableSynchronizer，其作用就是获取、设置拥有该锁的线程
+
+```java
+public abstract class AbstractOwnableSynchronizer
+    implements java.io.Serializable {
+
+
+    protected AbstractOwnableSynchronizer() { }
+
+	//当前拥有排它锁的线程
+    private transient Thread exclusiveOwnerThread;
+
+
+    protected final void setExclusiveOwnerThread(Thread thread) {
+        exclusiveOwnerThread = thread;
+    }
+
+
+    protected final Thread getExclusiveOwnerThread() {
+        return exclusiveOwnerThread;
+    }
+}
+```
 
 ### 1.AQS的核心思想
 
@@ -95,19 +140,7 @@ J.U.C是基于AQS实现的，AQS是一个同步器，设计模式是模板模式
 
 底层是CAS
 
-### 2.AQS同步器的应用
-
-　同步器主要使用方式是继承，子类通过继承同步器并实现它的抽象方法来管理同步状态，对同步状态的修改或者访问主要通过同步器提供的3个方法：
-
-- getState() 获取当前的同步状态
-
-- setState(int newState) 设置当前同步状态
-
-- compareAndSetState(int expect,int update) 使用CAS设置当前状态，该方法能够保证状态设置的原子性。
-
-   同步器可以支持独占式的获取同步状态，也可以支持共享式的获取同步状态，这样可以方便实现不同类型的同步组件。
-
-### 3.AQS同步队列
+### AQS同步队列
 
   ![](./img/AQS队列.png)
 
@@ -125,15 +158,32 @@ J.U.C是基于AQS实现的，AQS是一个同步器，设计模式是模板模式
 
 **AQS是独占锁和共享锁的实现的父类。**
 
-### 4. AQS锁类别：独占锁和共享锁。
+### 4. AQS模版方法
 
 AQS已经为我们提供了同步器的基础操作，如果要自定义同步器，必须实现以下几个方法：
 
 - `tryAcquire(int)`：独占方式。尝试获取资源，成功则返回true，失败则返回false。
+
 - `tryRelease(int)`：独占方式。尝试释放资源，成功则返回true，失败则返回false。
+
 - `tryAcquireShared(int)`：共享方式。尝试获取资源。负数表示失败；0表示成功，但没有剩余可用资源；正数表示成功，且有剩余资源。
+
 - `tryReleaseShared(int)`：共享方式。尝试释放资源，成功则返回true，失败则返回false。
+
 - `isHeldExclusively()`：该线程是否正在独占资源。只有用到Condition才需要去实现它。
+
+  - 代码如下
+
+  ```java
+     protected final boolean isHeldExclusively() {
+              // While we must in general read state before owner,
+              // we don't need to do so to check if current thread is owner
+       //判断持有锁的线程是否是当前线程
+              return getExclusiveOwnerThread() == Thread.currentThread();
+          }
+  ```
+
+  
 
 ---
 
@@ -148,18 +198,242 @@ AQS已经为我们提供了同步器的基础操作，如果要自定义同步�
 - 共享锁：同一个时候能够被多个线程获取的锁，能被共享的锁。JUC包中ReentrantReadWriteLock.ReadLock，CyclicBarrier，CountDownLatch和Semaphore都是共享锁。
   - 在`tryAcquireShared`中获取资源失败后，将当前线程加入等待队列尾部等待唤醒，成功获取资源后返回。在阻塞结束后成功获取到资源时，如果还有剩余资源，就调用`setHeadAndPropagate`方法继续唤醒之后的线程
 
- 
+### 公平锁lock的执行过程
 
-**实现了AQS的锁有：自旋锁、互斥锁、读锁写锁、条件产量、信号量、栅栏都是AQS的衍生物**
+A1:当我们执行xxx.lock的时候其实进入的是下面的方法
+
+```java
+   public void lock() {
+        sync.lock();
+    }
+```
+
+A2:所以我们具体看下sync.lock的实现，比如公平锁中的实现
+
+```java
+        final void lock() {
+            acquire(1);
+        }
+```
+
+A3：我们进入acquire方法,如果
+
+```java
+    public final void acquire(int arg) {
+      //如果没有获取到资源并且加入了队列尾部
+        if (!tryAcquire(arg) &&
+            acquireQueued(addWaiter(Node.EXCLUSIVE), arg))
+            selfInterrupt();
+    }
+```
+
+A4:发现其调用了tryAcquire方法，我们看下ReentrantLock公平锁的tryAcquire方法实现，如下
+
+```java
+//公平锁
+protected final boolean tryAcquire(int acquires) {
+    final Thread current = Thread.currentThread();
+    int c = getState();
+    //如果为0，说明没有被别人占用，可以进入
+    if (c == 0) {
+       //判断是否有有其它线程在排队,公平性操作
+        if (!hasQueuedPredecessors() &&
+            //如果没有其它线程在排队则用CAS比较交换
+                compareAndSetState(0, acquires)) {
+            setExclusiveOwnerThread(current);
+            return true;
+        }
+    }
+  //或者当前线程就是那个占有的线程，则重入
+    else if (current == getExclusiveOwnerThread()) {
+        int nextc = c + acquires;
+        if (nextc < 0)
+            throw new Error("Maximum lock count exceeded");
+        setState(nextc);
+        return true;
+    }
+    return false;
+}
+```
+
+5. 所以执行lock指令不一定能获取锁，如果没有获取锁，则就会把它加入到队列尾部
+
+### 非公平锁lock过程
+
+B1:调用xxx.lock之后，进入下面的lock方法，发现是直接CAS比较交换，成功则设置拥有者就是当前线程,失败了调用acquire方法的非公平实现
+
+```java
+*/
+final void lock() {
+if (compareAndSetState(0, 1))
+setExclusiveOwnerThread(Thread.currentThread());
+else
+acquire(1);
+}
+
+protected final boolean tryAcquire(int acquires) {
+return nonfairTryAcquire(acquires);
+}
+```
+
+B2:还记得上吗的acquire的实现是什么吗？直接把上面的copy过来，其实就是失败了直接加入队列尾部
+
+```java
+    public final void acquire(int arg) {
+      //如果没有获取到资源并且加入了队列尾部
+        if (!tryAcquire(arg) &&
+            acquireQueued(addWaiter(Node.EXCLUSIVE), arg))
+            selfInterrupt();
+    }
+```
+
+B3:是不是公平锁和非公平锁没有区别？NO，我们再去看上面的B1代码,里面重写了tryAcquire方法，具体调用的就是nonfairTryAcquire这个方法
+
+```java
+final boolean nonfairTryAcquire(int acquires) {
+            final Thread current = Thread.currentThread();
+            int c = getState();
+            if (c == 0) {
+                if (compareAndSetState(0, acquires)) {
+                    setExclusiveOwnerThread(current);
+                    return true;
+                }
+            }
+            else if (current == getExclusiveOwnerThread()) {
+                int nextc = c + acquires;
+                if (nextc < 0) // overflow
+                    throw new Error("Maximum lock count exceeded");
+                setState(nextc);
+                return true;
+            }
+            return false;
+        }
+```
+
+我们发现它不再判断当前队列里面有没有元素，而是直接CAS竞争了
+
+这就是公平锁和非公平锁的区别
+
+### AQS哪里用到了自旋操作？
+
+#### 加入队尾的时候自旋
+
+```
+private Node enq(final Node node) {
+//CAS自旋，直到加入队尾
+        for (;;) {
+            Node t = tail;
+            if (t == null) { // Must initialize
+                if (compareAndSetHead(new Node()))
+                    tail = head;
+            } else {
+                node.prev = t;
+                if (compareAndSetTail(t, node)) {
+                    t.next = node;
+                    return t;
+                }
+            }
+        }
+    }
+```
+
+#### 队列中第二个节点自旋获取资源
+
+```java
+final boolean acquireQueued(final Node node, int arg) {
+  // 标识是否获取资源失败
+        boolean failed = true;
+        try {
+          /// 标识当前线程是否被中断过
+            boolean interrupted = false;
+          //自旋
+            for (;;) {
+          
+								// 获取当前节点的前继节点
+                final Node p = node.predecessor();
+               //如果前驱是head，即该结点已成老二，那么便有资格去尝试获取资源（
+   							//可能是老大释放完资源唤醒自己的，当然也可能被interrupt了。
+                if (p == head && tryAcquire(arg)) {
+                  ////拿到资源后，将head指向该结点。所以head所指的标杆结点，就是当前获取到资源的那个结点或null。
+                    setHead(node);
+                    p.next = null; // help GC
+                    failed = false;
+                   // 返回中断标记
+                    return interrupted;
+                }
+					  // 若前继节点不是头结点，或者获取资源失败，
+            // 则需要通过shouldParkAfterFailedAcquire函数
+            // 判断是否需要阻塞该节点持有的线程
+            // 若shouldParkAfterFailedAcquire函数返回true，
+            // 则继续执行parkAndCheckInterrupt()函数，
+            // 将该线程阻塞并检查是否可以被中断，若返回true，则将interrupted标志置于true
+                if (shouldParkAfterFailedAcquire(p, node) &&
+                    parkAndCheckInterrupt())
+                    interrupted = true;
+            }
+        } finally {
+            if (failed)
+                cancelAcquire(node);
+        }
+    }
+```
+
+我们再来看下什么时候能够进入休息状态
+
+```java
+private static boolean shouldParkAfterFailedAcquire(Node pred, Node node) {
+        int ws = pred.waitStatus;
+        if (ws == Node.SIGNAL)
+						// 如果已经告诉前驱拿完号后通知自己一下，那就可以安心休息了
+            return true;
+        if (ws > 0) {
+
+          /*
+            * 如果前驱放弃了，那就一直往前找，直到找到最近一个正常等待的状态，并排在它的后边。
+            * 注意：那些放弃的结点，由于被自己“加塞”到它们前边，它们相当于形成一个无引用链，稍后就会被保安大叔赶走了(GC回收)！*/
+
+            do {
+                node.prev = pred = pred.prev;
+            } while (pred.waitStatus > 0);
+            pred.next = node;
+        } else {
+           //如果前驱正常，那就把前驱的状态设置成SIGNAL，告诉它拿完号后通知自己一下。
+          //以保证下次自旋时，shouldParkAfterFailedAcquire直接返回true
+            compareAndSetWaitStatus(pred, ws, Node.SIGNAL);
+        }
+        return false;
+    }
+```
+
+整个流程中，如果前驱结点的状态不是SIGNAL，那么自己就不能安心去休息，需要去找个安心的休息点，同时可以再尝试下看有没有机会轮到自己拿号。
+
+### 加入队列的整个流程
 
 
+
+1. 结点进入队尾后，检查状态，找到安全休息点；
+2. 调用park()进入waiting状态，等待unpark()或interrupt()唤醒自己；
+3. 被唤醒后，看自己是不是有资格能拿到号。如果拿到，head指向当前结点，并返回从入队到拿到号的整个过程中是否被中断过；如果没拿到，继续流程1。
+
+![](img/aqs队列.jpeg)
+
+### 为啥AQS要用park()、UnPark()？
+
+为啥不用sleep、wait(),唤醒的时候为啥不用notify()
+
+- 为啥不用notify，因为它是随机唤醒，而notifyAll是全部唤醒，AQS是想唤醒特定的线程
+- 为啥不用wait？因为执行wait()之前要首先获取到锁，而AQS的目的是让那些没有获取到锁的线程休息，所以不行
+- 为啥不用sleep？因为sleep会释放锁，但是我都没有获取锁，何来释放和wait()不行的原理差不多
+
+
+
+## AQS的应用
 
 AQS 定义了两种资源共享方式：
 1.**Exclusive**：独占，只有一个线程能执行，如ReentrantLock
 2.**Share**：共享，多个线程可以同时执行，如Semaphore、CountDownLatch、ReadWriteLock，CyclicBarrier
 
-**AQS底层使用了模板方法模式**
-## AQS的应用
+
 
 ### Semaphore信号量
 
@@ -393,7 +667,7 @@ CyclicBarrier回环屏障，主要是等待一组线程到底同一个状态的�
 
 因为这个，才诞生了读写锁ReadWriteLock。ReadWriteLock是一个读写锁接口，ReentrantReadWriteLock是ReadWriteLock接口的一个具体实现，实现了读写的分离，**读锁是共享的，写锁是独占的**，读和读之间不会互斥，读和写、写和读、写和写之间才会互斥，提升了读写的性能。
 
-### ReentrantLock
+### ReentrantLock和Synchronized的区别
 
 synchronized是和if、else、for、while一样的关键字，ReentrantLock是类，这是二者的本质区别。既然ReentrantLock是类，那么它就提供了比synchronized更多更灵活的特性，可以被继承、可以有方法、可以有各种各样的类变量，ReentrantLock比synchronized的扩展性体现在几点上：
 
@@ -403,7 +677,14 @@ synchronized是和if、else、for、while一样的关键字，ReentrantLock是�
 
 （3）ReentrantLock可以灵活地实现多路通知
 
-另外，二者的锁机制其实也是不一样的。ReentrantLock底层调用的是Unsafe的park方法加锁，
+另外，二者的锁机制其实也是不一样的。ReentrantLock底层调用的是Unsafe的park方法加锁，而sync是的重量级锁是依赖操作系统来实现的
+
+- 相同点
+  - 支持可重入
+  - 都有非公平实现
+  - 原理部分都依赖CAS
+
+
 
 ### ConcurrentSkipListMap
 
