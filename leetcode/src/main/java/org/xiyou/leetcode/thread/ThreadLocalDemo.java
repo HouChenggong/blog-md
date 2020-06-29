@@ -25,7 +25,9 @@ public class ThreadLocalDemo {
 
     private static void test(String s,boolean isGC)  {
         try {
-            new ThreadLocal<>().set(s);
+//            new ThreadLocal<>().set(s);
+            ThreadLocal<Object> threadLocal=new ThreadLocal<>();
+            threadLocal.set(s);
             if (isGC) {
                 System.gc();
             }

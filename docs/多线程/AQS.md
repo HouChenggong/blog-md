@@ -496,6 +496,7 @@ public class SemaphoreExample1 {
 
 - acquire（） release（） 可用于对象池，资源池的构建，比如静态全局对象池，数据库连接池；
 - 可创建计数为1的S，作为互斥锁（二元信号量）
+- 一个文件同时能有多少个线程访问
 
 ### CountDownLatch
 
@@ -668,6 +669,16 @@ CyclicBarrier回环屏障，主要是等待一组线程到底同一个状态的�
 因为这个，才诞生了读写锁ReadWriteLock。ReadWriteLock是一个读写锁接口，ReentrantReadWriteLock是ReadWriteLock接口的一个具体实现，实现了读写的分离，**读锁是共享的，写锁是独占的**，读和读之间不会互斥，读和写、写和读、写和写之间才会互斥，提升了读写的性能。
 
 ### ReentrantLock和Synchronized的区别
+
+#### ReentrantLock可重入的实现
+
+内部自定义了同步器 Sync，加锁的时候通过CAS 算法 ，将线程对象放到一个双向链表 中，每次获取锁的时候 ，看下当前维 护的那个线程ID和当前请求的线程ID是否一样，一样就可重入了；
+
+#### ReentrantLock如何避免死锁?
+
+- 响应中断lockInterruptibly（）
+- 可轮询锁tryLock（）
+- 定时锁tryLock（long time）
 
 synchronized是和if、else、for、while一样的关键字，ReentrantLock是类，这是二者的本质区别。既然ReentrantLock是类，那么它就提供了比synchronized更多更灵活的特性，可以被继承、可以有方法、可以有各种各样的类变量，ReentrantLock比synchronized的扩展性体现在几点上：
 

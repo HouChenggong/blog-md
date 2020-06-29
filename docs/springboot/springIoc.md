@@ -247,8 +247,8 @@ class Solution {
 在Spring的`DefaultSingletonBeanRegistry`类中，你会赫然发现类上方挂着这三个Map：
 
 - *singletonObjects* 它是我们最熟悉的朋友，俗称“**单例池**”“**容器**”，缓存创建完成单例Bean的地方。
-- *singletonFactories* 映射创建Bean的原始工厂
 - *earlySingletonObjects* 
+- *singletonFactories* 映射创建Bean的原始工厂
 
 *earlySingletonObjects* 是映射Bean的**早期**引用，也就是说在这个Map里的Bean不是完整的，甚至还不能称之为“**Bean**”，只是一个**Instance**.早期单例缓存池，用于保存尚未创建完成的用于早期暴露的单例Bean，是Map，它与singletonObjects是互斥的，就是不可能同时保存于两者之中，只能择一而存，保存在该缓存池中的是尚未完成创建，而被注入到其他Bean中的Bean实例，可以说该缓存就是一个中间缓存（或者叫过程缓存），只在当将该BeanName对应的原生Bean（处于创建中池）注入到另一个bean实例中后，将其添加到该缓存中，这个缓存中保存的永远是半成品的bean实例，当Bean实例最终完成创建后会从此缓存中移除，转移到singletonObjects缓存中保存。
 
