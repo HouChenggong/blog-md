@@ -354,7 +354,11 @@ int c=a+b;//不管怎么重排序c的结果不能变
 
 ![](./img/读内存屏障.png)
 
+### loadload内存屏障的意义
 
+https://blog.csdn.net/ly262173911/article/details/106063924/
+
+http://www.voidcn.com/article/p-zgltkglv-buv.html
 
 ##  JVM Happens-before原则：
 

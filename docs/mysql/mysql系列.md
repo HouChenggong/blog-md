@@ -101,11 +101,24 @@ alter table users AUTO_INCREMENT=1000;
 - InnoDB In-Memory Structures 内存
 - InnoDB On-Disk Structures     磁盘
 
+### WAL和redo log
+
+WAL全称是write ahead log，也就是更新数据之前先更新日志
+
+- 为啥要引入redo log？
+
+磁盘的写操作是随机io，比较耗性能，所以如果把每一次的更新操作都先写入log中，那么就成了顺序写操作，实际更新操作由后台线程再根据log异步写入。这样对于client端，延迟就降低了。并且，由于顺序写入大概率是在一个磁盘块内，这样产生的io次数也大大降低。所以WAL的核心在于将随机写转变为了顺序写，降低了客户端的延迟，提升了吞吐量。
+
+至于说redo log可以恢复数据，这不是原因，而是结果。如果不用WAL，就直接每一次都裸写磁盘，那根本不会有什么数据恢复的问题，什么时候宕机，那个时候之前的数据就是写入成功的。换句话说，正是因为用了WAL，才需要考虑宕机数据恢复的问题，因为有些数据还没刷到磁盘上啊。
+
+
 ### mysql内存bufferPool
 
 正如之前提到的，MySQL 不会直接去修改磁盘的数据，因为这样做太慢了，MySQL 会先改内存，然后记录 redo log，等有空了再刷磁盘，如果内存里没有数据，就去磁盘 load。
 
 而这些数据存放的地方，就是 Buffer Pool。
+
+- 所以：buffer pool是一种减少磁盘io读的机制，原理是将访问过的磁盘数据暂留在内存中，这样下次访问相同的数据就不需要读磁盘了。
 
 我们平时开发时，会用 redis 来做缓存，缓解数据库压力，其实 MySQL 自己也做了一层类似缓存的东西。
 
@@ -121,7 +134,8 @@ Buffer Pool 采用基于 LRU（least recently used） 的算法来管理内存�
 
 上面提到过，如果内存里没有对应「页」的数据，MySQL 就会去把数据从磁盘里 load 出来，如果每次需要的「页」都不同，或者不是相邻的「页」，那么每次 MySQL 都要去 load，这样就很慢了。
 
-于是如果 MySQL 发现你要修改的页，不在内存里，就把你要对页的修改，先记到一个叫 Change Buffer 的地方，同时记录 redo log，然后再慢慢把数据 load 到内存，load 过来后，再把 Change Buffer 里记录的修改，应用到内存（Buffer Pool）中，这个动作叫做 **merge**；而把内存数据刷到磁盘的动作，叫 **purge**：
+对于一次更新操作，innodb引擎会看更新的页是否在buffer pool中，如果在，那么直接更新buffer pool，并且写入一条redo log。这样后续的读取操作可以读到最新的值。如果不在，那么就先将本次更新操作记录到change buffer中，而不是立刻取更新，最后再记录一条redo log。如果后面有读操作，那么再将对应的数据页载入到buffer pool中，同时将change pool中的更新操作应用到该数据页，这个过程叫做merge。当然如果系统是空闲状态，也会有后台线程去做merge过程。
+ 而把内存数据刷到磁盘的动作，叫 **purge**：
 
 - **merge：Change Buffer -> Buffer Pool**
 - **purge：Buffer Pool -> Disk**
@@ -132,8 +146,26 @@ Buffer Pool 采用基于 LRU（least recently used） 的算法来管理内存�
 
 上面是 MySQL 官网对 Change Buffer 的定义，仔细看的话，你会发现里面提到：Change Buffer 只在操作「二级索引」（secondary index）时才使用，原因是「聚簇索引」（clustered indexes）必须是「唯一」的，也就意味着每次插入、更新，都需要检查是否已经有相同的字段存在，也就没有必要使用 Change Buffer 了；另外，「聚簇索引」操作的随机性比较小，通常在相邻的「页」进行操作，比如使用了自增主键的「聚簇索引」，那么 insert 时就是递增、有序的，不像「二级索引」，访问非常随机。
 
+### 脏叶
 
+脏页的定义是内存中和磁盘中的不一致页。
 
+- 内存不够的时候，要淘汰一部分老的数据页，如果不刷回磁盘，就会丢失数据
+- Redo log 满了，也要刷回脏页
+- 系统空闲的时候，自动会刷脏页
+- 系统关闭的时候也会刷脏页
+
+### redo log刷盘时机
+
+- Redo log 满了
+- 后台线程
+- 事物提交，当然这个并不是绝对的，取决于数据库innodb_flush_log_at_trx_commit配置。
+- buffer pool满了，需要刷脏页时；
+- checkpoint
+
+innodb_flush_log_at_trx_commit配置
+
+参数决定了事务提交时的行为。0：代表每一次提交只是写入到redo log buffer，如果mysql进程挂了，会丢数据，这是不安全的；1：代表每一次提交都写入磁盘，fsync；2：代表每一次提交都写入操作系统写缓冲，write，如果操作系统挂了，会丢数据；
 
 
 ## mysql索引
@@ -355,7 +387,7 @@ MySQL是支持前缀索引的，也就是说，你可以定义字符串的一部
 
 我当时就回答了一个hash，把字段hash为另外一个字段存起来，每次校验hash就好了，hash的索引也不大。
 
-## flush 
+## flush 刷盘
 
 redo log大家都知道，也就是我们对数据库操作的日志，他是在内存中的，每次操作一旦写了redo log就会立马返回结果，但是这个redo log总会找个时间去更新到磁盘，这个操作就是flush。
 
@@ -406,4 +438,18 @@ Innodb刷脏页控制策略，我们每个电脑主机的io能力是不一样的
 - 当在从库上启动复制时，首先创建I/O线程连接主库，主库随后创建Binlog Dump线程读取数据库事件并发送给I/O线程，I/O线程获取到事件数据后更新到从库的中继日志Relay Log中去，之后从库上的SQL线程读取中继日志Relay Log中更新的数据库事件并应用，如下图所示。
 
 [binlog](https://mp.weixin.qq.com/s/Lx4TNPLQzYaknR7D3gmOmQ)
+
+### 主从两段式提交
+
+redo log与binlog需要两段式提交，防止只有一个写入成功，这样会出现数据不一致；如果只有redo log成功，从库不一致；反之，主库不一致；
+
+大致过程：
+
+```java
+redo log prepare；
+
+binglog write；
+
+commit；
+```
 
