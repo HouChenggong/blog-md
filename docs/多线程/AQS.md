@@ -314,6 +314,12 @@ final boolean nonfairTryAcquire(int acquires) {
 
 这就是公平锁和非公平锁的区别
 
+### 公平和非公平的区别
+
+1. 区别1:**第一次是否可以进行CAS比较**。公平锁直接调用tryAcquire方法，而非公平锁先CAS，只有CAS失败了才去调用tryAcquire方法
+2. 区别2:tryAcquired的方法的不同。公平锁是：先判断队列中是否有元素，有元素的话就乖乖排队，而非公平锁不需要判断队列中是否有元素，如果state为0，再次CAS，如果这次还失败，那就只能乖乖进入队列
+3. 总结：非公平锁在加入队列之前要进行两次CAS操作，都失败了才去加入队列中
+
 ### AQS哪里用到了自旋操作？
 
 #### 加入队尾的时候自旋
@@ -422,7 +428,7 @@ private static boolean shouldParkAfterFailedAcquire(Node pred, Node node) {
 为啥不用sleep、wait(),唤醒的时候为啥不用notify()
 
 - 为啥不用notify，因为它是随机唤醒，而notifyAll是全部唤醒，AQS是想唤醒特定的线程
-- 为啥不用wait？因为执行wait()之前要首先获取到锁，而AQS的目的是让那些没有获取到锁的线程休息，所以不行
+- nonfairTryAcquire为啥不用wait？因为执行wait()之前要首先获取到锁，而AQS的目的是让那些没有获取到锁的线程休息，所以不行
 - 为啥不用sleep？因为sleep会释放锁，但是我都没有获取锁，何来释放和wait()不行的原理差不多
 
 
@@ -670,6 +676,8 @@ CyclicBarrier回环屏障，主要是等待一组线程到底同一个状态的�
 
 ### ReentrantLock和Synchronized的区别
 
+ReentrantLock 三个特点：支持公平锁、支持锁超时或者说是锁打断机制、支持Condition条件
+
 #### ReentrantLock可重入的实现
 
 内部自定义了同步器 Sync，加锁的时候通过CAS 算法 ，将线程对象放到一个双向链表 中，每次获取锁的时候 ，看下当前维 护的那个线程ID和当前请求的线程ID是否一样，一样就可重入了；
@@ -695,7 +703,9 @@ synchronized是和if、else、for、while一样的关键字，ReentrantLock是�
   - 都有非公平实现
   - 原理部分都依赖CAS
 
-
+- 不同点
+  - ReentrantLock有一个非常实用的功能，就是超时返回
+  - 有公平和非公平的实现
 
 ### ConcurrentSkipListMap
 

@@ -25,6 +25,12 @@
 
 #### random类的多线程版本ThreadLocalRandom
 
+#### mybatis读写分离
+
+通过ThreadLocal将数据源设置到每个线程上下文中
+
+
+
 我们知道random类其实内部使用AtomicInteger来实现的，而AtomicInteger上通过CAS来实现的，所以多线程下效率不高，而ThreadLocalRandom是给每个线程一个AtomicInteger，所以不用通过ca s自旋了，效率很高
 
 - 每个线程需要一个独享对象（通常是工具类，典型需要使用的类有SimpleDateFormat和Random）

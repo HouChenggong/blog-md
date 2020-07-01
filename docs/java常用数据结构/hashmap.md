@@ -325,7 +325,7 @@ Java1.8相比1.7做了调整，1.7做了四次移位和四次异或，但明显J
 
 **第一：为了用&运算！为啥，因为&运算比取模运算快，上面也说了原因**
 
-**第二：用了&运算之后，如果不是2的整数倍，就无法均匀分布！**
+**第二：用了&运算之后，如果不是2的整数倍，重新hash后就无法均匀分布！**
 
 距离分析：比如一个对象的hash值后5位是11001
 
@@ -539,6 +539,51 @@ JDK1.7的 ConcurrentHashMap 底层采用 **分段的数组+链表** 实现，JDK
 synchronized只锁定当前链表或红黑二叉树的首节点，这样只要hash不冲突，就不会产生并发，效率又提升N倍。
 
 **Hashtable(同一把锁)** :使用 synchronized 来保证线程安全，效率非常低下。当一个线程访问同步方法时，其他线程也访问同步方法，可能会进入阻塞或轮询状态，如使用 put 添加元素，另一个线程不能使用 put 添加元素，也不能使用 get，竞争会越来越激烈效率越低。
+## 1.8的实现
+
+### put
+
+- 没有hash冲突，直接cas插入
+- 有冲突，就给当前节点加synchronized保证线程安全，链表或者二叉树
+
+### get
+
+1. 计算hash值，定位到该table索引位置，如果是首节点符合，则返回
+2. 如果遇到扩容的时候，会调用标志正在扩容节点Forwarding Node的find方法，查找该节点，若匹配则返回
+3. 以上都不符合的话，就向下遍历节点，遇到匹配节点就返回，否则最后返回null
+
+### size
+
+```java
+final long sumCount() {
+    CounterCell[] as = counterCells; CounterCell a;
+    long sum = baseCount;
+    if (as != null) {
+       for (int i = 0; i < as.length; ++i) {
+           if ((a = as[i]) != null)
+               sum += a.value;
+           }
+       }
+    return sum;
+}
+```
+
+
+
+- JDK1.8 size 是通过对 baseCount 和 counterCell 进行 CAS 计算，最终通过 baseCount 和 遍历 CounterCell 数组得出 size。
+- JDK 8 推荐使用mappingCount 方法，因为这个方法的返回值是 long 类型，不会因为 size 方法是 int 类型限制最大值
+
+所以size的操作还是由于添加size的时候不同导致的addCount()方法
+
+```
+1. 没有竞争counterCells == null, 则对 baseCount 做 CAS 自增操作。
+2. 如果并发导致 baseCount CAS 失败了使用 counterCells。
+3. 如果counterCells CAS 失败了，在 fullAddCount 方法中，会继续死循环操作，直到成功。
+
+
+```
+
+
 
 ## 1.7的具体实现
 
@@ -778,8 +823,6 @@ get方法和containsKey方法都是通过对链表遍历判断是否存在key相
 ### 1.7ConcurrentHashMap的get方法是否要加锁，为什么？
 
 不需要
-
- 
 
 get操作可以无锁是由于Node的元素val和指针next是用volatile修饰的，在多线程环境下线程A修改结点的val或者新增节点的时候是对线程B可见的。和数组用volatile修饰没有关系。
 
