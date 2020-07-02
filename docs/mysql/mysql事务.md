@@ -226,5 +226,15 @@ mysql> select * from test where id =1 for update;
 
 
 
+### 避免幻读的原理
 
+```mysql
+**SELECT** * **FROM** **child** **WHERE** **id** > 100 **FOR** **UPDATE**;
+```
+
+这样，InnoDB会给id大于100的行（假如child表里有一行id为102），以及100-102，102+的gap都加上锁。
+
+
+
+**MySQL InnoDB的可重复读并不保证避免幻读，需要应用使用加锁读来保证。而这个加锁度使用到的机制就是next-key locks。**
 

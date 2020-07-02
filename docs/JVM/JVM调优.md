@@ -1,6 +1,24 @@
-### 可达性算法
+### 题外话：永久代——元空间
 
-GC Root 可以作为根的是：本地变量、静态变量、本地方法栈等
+元空间与永久代之间最大的区别在于：元空间并不在虚拟机中，而是使用本地内存。因此，默认情况下，元空间的大小仅受本地内存限制，但可以通过参数来指定元空间的大小
+
+符号引用没有存在元空间中，而是存在native heap中，这是两个方式和位置，不过都可以算作是本地内存，在虚拟机之外进行划分，没有设置限制参数时只受物理内存大小限制，即只有占满了操作系统可用内存后才OOM。
+
+ 
+
+- 为啥要变成元空间？
+  - 字符串1.7在永久代中，会出现内存溢出和性能问题
+  - 元空间不在虚拟机栈中，而是直接使用本地内存
+  - 类及方法的信息等比较难确定其大小，因此对于永久代的大小指定比较困难，太小容易出现永久代溢出，太大则容易导致老年代溢出。
+  - 永久代会为 GC 带来不必要的复杂度，并且回收效率偏低。
+
+### 常量池到了哪里？
+
+Java6和6之前，常量池是存放在方法区（永久代）中的。
+
+Java7，将常量池是存放到了堆中。
+
+Java8之后，取消了整个永久代区域，取而代之的是元空间。运行时常量池和静态常量池存放在元空间中，而字符串常量池依然存放在堆中。
 
 ![](.\img\堆的分代.png)
 
@@ -104,6 +122,24 @@ Java VisualVM安装 Visual GC
 
 ## 排查问题
 
+把OutOfMemoryError输出出来到文件夹中，但是前提是要有这个文件夹
+
+-XX:+HeapDumpOnOutOfMemoryError
+
+-XX:HeapDumpPath=C:\cobot\OutOfMemoryError
+
+输入GC细节
+
+-XX:+PrintGCDetails -XX:+PrintGCTimeStamps -XX:+PrintGCDateStamps
+
+GC日志输出
+
+-Xloggc:E:\cobot\OutOfMemoryError\gc-%t.log
+
+文章介绍：
+
+https://blog.csdn.net/sinat_27933301/article/details/97842549
+
 ### 1.频繁FULL GC
 
 - 内存泄漏
@@ -133,4 +169,84 @@ select * from user where 1=1
 						可选。 				 	文件名 					 pid
 jmap -dump:live,format=b,file=myjmapfile.txt 19570
 ```
+
+## 参加参数
+
+### **9.-Xmx -Xms**
+
+这个就表示设置堆内存的最大值和最小值。这个设置了最大值和最小值后，jvm启动后，并不会直接让堆内存就扩大到指定的最大数值。而是会先开辟指定的最小堆内存，如果经过数次GC后，还不能，满足程序的运行，才会逐渐的扩容堆的大小，但也不是直接扩大到最大内存。
+
+- Xmn**
+
+设置新生代的内存大小。
+
+- XX:NewRatio**
+
+新生代和老年代的比例。比如：1：4，就是新生代占五分之一。
+
+- XX:SurvivorRatio**
+
+设置两个Survivor区和eden区的比例。比如：2：8 ，就是一个Survivor区占十分之一。
+
+- XX:+HeapDumpOnOutMemoryError**
+
+发生OOM时，导出堆的信息到文件。
+
+- XX:+HeapDumpPath**
+
+表示，导出堆信息的文件路径。
+
+- XX:OnOutOfMemoryError**
+
+当系统产生OOM时，执行一个指定的脚本，这个脚本可以是任意功能的。比如生成当前线程的dump文件，或者是发送邮件和重启系统。
+
+- XX:PermSize -XX:MaxPermSize**
+
+设置永久区的内存大小和最大值。永久区内存用光也会导致OOM的发生。
+
+- Xss**
+
+设置栈的大小。栈都是每个线程独有一个，所有一般都是几百k的大小。
+
+## MAC 相关参数
+
+```java
+/usr/libexec/java_home -V
+  //下面是我的安装位置
+/Library/Java/JavaVirtualMachines/jdk1.8.0_231.jdk/Contents/Home
+```
+
+- 线程dump命令jstack
+- 堆du mp就是map
+
+```
+#用法：
+jmap ‐dump:format=b,file=dumpFileName <pid>
+
+#示例
+jmap ‐dump:format=b,file=/tmp/dump.dat 11927
+```
+
+- metaspace表示元空间大小
+
+
+
+
+
+### 我平常测试的参数
+
+```java
+-XX:+HeapDumpOnOutOfMemoryError
+-XX:HeapDumpPath=/Users/xiyouyan/cobot/OutOfMemoryError
+-XX:+PrintGCDetails
+-XX:+PrintGCTimeStamps
+-XX:+PrintGCDateStamps
+-Xloggc:/Users/xiyouyan/cobot/OutOfMemoryError/gc-%t.log
+-Xmx20M
+-Xms10M
+```
+
+  
+
+
 

@@ -185,6 +185,10 @@ volatile读操作 LoadStoreBarrier   loadLoadBarrier
 
 ## 现代计算机模型
 
+### 在总线上添加LOCK锁的方式
+
+在早期的 CPU 中，是通过在总线上加 LOCK# 锁的形式来解决缓存不一致的问题。因为 CPU 和其他部件进行通信都是通过总线来进行的，如果对总线加 LOCK# 锁的话，也就是说阻塞了其他 CPU 对其他部件访问（如内存），从而使得只能有一个 CPU 能使用这个变量的内存。比如上面例子中 如果一个线程在执行 i = i +1，如果在执行这段代码的过程中，在总线上发出了 LCOK# 锁的信号，那么只有等待这段代码完全执行完毕之后，其他CPU 才能从变量 i 所在的内存读取变量，然后进行相应的操作。这样就解决了缓存不一致的问题。
+
 ### MESI
 
 
@@ -360,6 +364,44 @@ https://blog.csdn.net/ly262173911/article/details/106063924/
 
 http://www.voidcn.com/article/p-zgltkglv-buv.html
 
+```java
+public class VolatileExample {
+int a = 0;
+volatile boolean flag = false;
+public void writer() {
+ a = 1; // step 1
+ flag = true; // step 2
+ }
+public void reader() {
+if (flag) { // step 3
+ System.out.println(a); // step 4
+ }
+ }
+}
+```
+
+在JSR-133之前的旧的Java内存模型中，是允许volatile变量与普通变量重排序的。 
+
+那上⾯的案例中，可能就会被重排序成下列时序来执⾏： 
+
+```java
+\1. 线程A写volatile变量，step 2，设置flag为true； 
+
+\2. 线程B读同⼀个volatile，step 3，读取到flag为true； 
+
+\3. 线程B读普通变量，step 4，读取到 a = 0； 
+
+\4. 线程A修改普通变量，step 1，设置 a = 1； 
+  //发现即使volatile保证了可见性，但是仍然导致普通变量读取错误
+```
+
+**JSR-133**专家组决定增强volatile的内存语义：严格限制编译器和处理器对volatile变量与普通变量的重排序。
+
+![](./img/volatile.jpeg)
+
+ 
+ 
+
 ##  JVM Happens-before原则：
 
 如果一个操作执行的结果需要对另一个操作可见，那么这两个操作之间必须存在happens-before关系。
@@ -396,3 +438,4 @@ happens-before原则：
  
 
 ```
+
