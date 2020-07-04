@@ -242,8 +242,8 @@ jmap ‐dump:format=b,file=/tmp/dump.dat 11927
 -XX:+PrintGCTimeStamps
 -XX:+PrintGCDateStamps
 -Xloggc:/Users/xiyouyan/cobot/OutOfMemoryError/gc-%t.log
--Xmx20M
--Xms10M
+-Xmx2000M
+-Xms1000M
 ```
 
   

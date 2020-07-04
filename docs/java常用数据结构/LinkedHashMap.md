@@ -1,3 +1,67 @@
+## LinkedHashMap原理
+
+[一个介绍](https://blog.csdn.net/blingfeng/article/details/79974169)
+
+### 结构
+
+双向链表，注意不是双向循环链表
+
+```java
+/**
+ * The head (eldest) of the doubly linked list.
+ */
+transient LinkedHashMap.Entry<K,V> head;
+
+/**
+ * The tail (youngest) of the doubly linked list.
+ */
+transient LinkedHashMap.Entry<K,V> tail;
+    /**
+     * The iteration ordering method for this linked hash map: <tt>true</tt>
+     * for access-order, <tt>false</tt> for insertion-order.
+     *//ture表示访问顺序，false表示插入顺序，默认是插入顺序
+     * @serial
+     */
+    final boolean accessOrder;
+```
+
+### put()
+
+- put其实是调用HashMap的put方法，只不过重写了newNode方法，如下：
+
+```java
+    Node<K,V> newNode(int hash, K key, V value, Node<K,V> e) {
+        LinkedHashMap.Entry<K,V> p =
+            new LinkedHashMap.Entry<K,V>(hash, key, value, e);
+      //将节点插入链表尾部
+        linkNodeLast(p);
+        return p;
+    }
+```
+
+```java
+ // link at the end of list
+    private void linkNodeLast(LinkedHashMap.Entry<K,V> p) {
+        LinkedHashMap.Entry<K,V> last = tail;
+        tail = p;
+      // 如果链尾为空，则双向链表为空，则p即为头结点也为尾节点
+        if (last == null)
+            head = p;
+        else {
+          
+         //否则的话修改指针，让之前链尾的after指针指向p，p的before指向之前链尾
+            p.before = last;
+            last.after = p;
+        }
+    }
+```
+
+
+
+### 为啥插入的时候要插入链表尾部？
+
+因为要保证插入的顺序，不是双向循环链表，所以插入的时候一定要插入到链表尾部
+
 ### 访问
 
 这里accessOrder设置为false，表示不是访问顺序而是插入顺序存储的，这也是默认值
