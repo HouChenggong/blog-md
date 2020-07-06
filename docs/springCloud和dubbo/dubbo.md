@@ -30,10 +30,230 @@ http://dubbo.apache.org/zh-cn/blog/index.html
 
   - Dubbo 2.7 中使用了 JDK1.8 提供的 `CompletableFuture` 原生接口对自身的异步化做了改进。`CompletableFuture` 可以支持 future 和 callback 两种调用方式，用户可以根据自己的喜好和场景选择使用，非常灵活。
 
+## RPC 原理
+
+一次完整的RPC调用流程（同步调用，异步另说）如下： 
+
+***\*1）服务消费方（client）调用以本地调用方式调用服务；\**** 
+
+2）client 代理对象接收到调用后负责将方法、参数等组装成能够进行网络传输的消息体； 
+
+3）client  代理对象找到服务地址，并将消息发送到服务端； 
+
+4）server  代理对象收到消息后进行解码； 
+
+5）server 代理对象根据解码结果调用本地的服务； 
+
+6）server本地服务执行并将结果返回给server  代理对象； 
+
+7）server  代理对象将返回结果打包成消息并发送至消费方； 
+
+8）client  代理对象接收到消息，并进行解码； 
+
+***\*9）服务消费方得到最终结果。\****
+
+RPC框架的目标就是要2~8这些步骤都封装起来，这些细节对用户来说是透明的，不可见的。
+
+
+
+### IO 模型
+
+- BIO阻塞IO
+- NIO非阻塞IO
+- 多路复用IO
+- 异步AIO
+
+
+
+### 多路复用I/O
+
+elect，poll，epoll都是IO多路复用的机制。I/O多路复用就是通过一种机制，一个进程可以监视多个描述符，一旦某个描述符就绪（一般是读就绪或者写就绪），能够通知程序进行相应的读写操作。但select，poll，epoll本质上都是同步I/O，因为他们都需要在读写事件就绪后自己负责进行读写，也就是说这个读写过程是阻塞的，而异步I/O则无需自己负责进行读写，异步I/O的实现会负责把数据从内核拷贝到用户空间。
+
+
+
+在 select/poll中，进程只有在调用一定的方法后，内核才对所有监视的文件描述符进行扫描，而epoll事先通过epoll_ctl()来注册一 个文件描述符，一旦基于某个文件描述符就绪时，内核会采用类似callback的回调机制，迅速激活这个文件描述符，当进程调用epoll_wait() 时便得到通知。(此处去掉了遍历文件描述符，而是通过监听回调的的机制。这正是epoll的魅力所在。)
+
+#### select
+
+用户程序发起读操作后，将阻塞查询读数据是否可用，直到内核准备好数据后，用户程序才会真正的读取数据。
+
+- 数据结构是数组，所以有最大限制
+- 一个线程可以处理N个Socket请求
+- 每次调用Select，轮询所有socket
+
+原理？
+
+监听连接时，从用户层的角度看，
+（1）会构建3个fd数组，分别关注读/写/异常事件，设置超时时间，调用系统提供的select方法。
+（2）调用select方法时，需要将fd数组传到内核态，等待部分fd就绪后，把fd数组（包含就绪状态）返回到用户态
+（3）用户程序对fd数组进行遍历，处理就绪的fd
+（4）重新调用select方法。
+
+可以看出不好的地方是（1）每次都要传入fd数组，返回整个fd数组，导致了大量在用户空间和内核空间的相互拷贝。
+（2）用户程序仍需要遍历fd数组才能找出就绪的fd
+
+ 
+
+#### poll
+
+poll与select的原理相似，用户程序都要阻塞查询事件是否就绪，但poll没有最大文件描述符的限制。
+
+- 数据结构是链表，没有最大限制
+
+#### epoll
+
+epoll使用“事件”的方式通知用户程序数据就绪，并且使用内存拷贝的方式使用户程序直接读取内核准备好的数据，不用再读取数据
+
+数据结构： 红黑树+双向链表
+
+epoll相对select改善了很多。
+（1）在使用epoll时，首先会构建epoll对象。
+（2）有连接接入时，会插入到epoll对象中，epoll对象里实际是一个红黑树+双向链表，fd插入到红黑树中，通过红黑树查找到是否重复
+（3）一旦fd就绪，会触发回调把fd的插入到就绪链表中，并唤醒等待队列中的线程。
+（4）调用epoll_wait方法时只需要检查就绪链表，如有则返回给用户程序，如没有进入等待队列。
+
+由于epoll把fd管理起来，不需要每次都重复传入，而且只返回就绪的fd，因此减少了用户空间和内核空间的相互拷贝，在fd数量庞大的时候更加高效
+
+ 
+
+### Netty
+
+![](./img/BIO.png)
+
+
+
+![](./img/NIO.png)
+
+
+
+网络IO和磁盘IO都可以称为IO
+
+- BIO:每个请求都开一个Socket，并开一个线程处理
+  - 阻塞IO、读写都阻塞
+  - 不能同时处理大量请求
+
+- NIO
+  - Selector（多路复用选择器） 监听多个通道的各种事件
+  - 某个通道的某个事件准备好了，开一个线程进行
+  - 其实多路复用就是：同时监听多个Channel，当某个channel的任务完成的时候，比如读取完成了，才去开启一个线程执行。而BIO是来了就阻塞
+  - 一个selector对应一个线程
+
+
+
+### netty流程
+
+
+
+![](./img/netty.png)
+
+
+
+1. ServerBootstrap启动，绑定并监听某个端口，把这个端口的所有请求都接管
+2. 初始化NIOServerSocketChannel，并注册到Selector中
+3. 建立一个与worker的通道NIOSocketChannel并注册到worker的Selector中
+4. boss里面的selector是监听的accept事件，也就是接受准备就绪的状态
+5. 而worder的selector监听的是read、write准备就绪的状态
+6. 然后去执行相应的任务
+
+
+
+
+
+
+
+**`EventLoop` 的主要作用实际就是负责监听网络事件并调用事件处理器进行相关 I/O 操作的处理。**
+
+那 `Channel` 和 `EventLoop` 直接有啥联系呢？
+
+`Channel` 为 Netty 网络操作(读写等操作)抽象类，`EventLoop` 负责处理注册到其上的`Channel` 处理 I/O 操作，两者配合参与 I/O 操作。
+
+
+
+```java
+Netty抽象出两组线程池 BossGroup 专门负责接收客户端的连接, WorkerGroup 专门负责网络的读写
+BossGroup 和 WorkerGroup 类型都是 NioEventLoopGroup
+NioEventLoopGroup 相当于一个事件循环组, 这个组中含有多个事件循环 ，每一个事件循环是 NioEventLoop
+NioEventLoop 表示一个不断循环的执行处理任务的线程， 每个NioEventLoop 都有一个selector , 用于监听绑定在其上的socket的网络通讯
+NioEventLoopGroup 可以有多个线程, 即可以含有多个NioEventLoop
+每个Boss NioEventLoop 循环执行的步骤有3步
+轮询accept 事件
+处理accept 事件 , 与client建立连接 , 生成NioScocketChannel , 并将其注册到某个worker NIOEventLoop 上的 selector 
+处理任务队列的任务 ， 即 runAllTasks
+7) 每个 Worker NIOEventLoop 循环执行的步骤
+轮询read, write 事件
+处理i/o事件， 即read , write 事件，在对应NioScocketChannel 处理
+处理任务队列的任务 ， 即 runAllTasks
+8) 每个Worker NIOEventLoop  处理业务时，会使用pipeline(管道), pipeline 中包含了 channel , 即通过pipeline 可以获取到对应通道, 管道中维护了很多的 处理器
+
+```
+
+
+
+### Netty线程模型
+
+#### 传统线程模型
+
+- 传统阻塞I/O模型
+
+- Reactor线程模型
+
+  - 根据Reactor的数量和处理资源线程池的数量不同，有3种具体的实现
+  - 单Reactor单线程
+
+  一个线程需要执行处理所有的 `accept`、`read`、`decode`、`process`、`encode`、`send` 事件。对于高负载、高并发，并且对性能要求比较高的场景不适用。
+
+  - 单Reactor多线程
+
+  一个 Acceptor 线程只负责监听客户端的连接，一个 NIO 线程池负责具体处理： `accept`、`read`、`decode`、`process`、`encode`、`send` 事件。满足绝大部分应用场景，并发连接量不大的时候没啥问题，但是遇到并发连接大的时候就可能会出现问题，成为性能瓶颈。
+
+  - 主从Reactor多线程
+
+1. (一主，多从三层结构，一个主Reactor监听，通过Acceptor处理连接事件)
+
+2. 当Accept处理连接事件后，MainRector将连接分配给SubReactor，从而保证mainReactor只负责接入认证、握手等操作。
+3. SubReactor将连接加入到连接队列，并创建Handler，当有新事件发生时，SubReactor就会调用对应的Handler处理
+
+从一个 主线程 NIO 线程池中选择一个线程作为 Acceptor 线程，绑定监听端口，接收客户端连接的连接，其他线程负责后续的工作。连接建立完成后，Sub NIO 线程池负责具体处理 I/O 读写。如果多线程模型无法满足你的需求的时候，可以考虑使用主从多线程模型 。
+
+- Netty线程模型
+  - 基于主从Reactor多线程模型进行了改进
 
 ## dubbo
 
+### 框架设计
+
+http://dubbo.apache.org/zh-cn/docs/dev/design.html
+
+- business 用户关注的层面，由接口和实现类组成、
+- RPC
+  - Config: 解析配置信息
+  - Proxy：生成客户、服务端代理对象进行调用方法
+  - Rregistry：注册中心，服务的注册与发现
+  - Cluster：负载均衡
+  - Monitor：监控中心
+  - Protocol：核心：Invoker 、Protocol、Exporter也就是只要有 Protocol + Invoker + Exporter 就可以完成非透明的 RPC 调用，然后在 Invoker 的主过程上 Filter 拦截点。
+
+- R emoting：远程通信层
+  - Exchange：客户端和服务端的通信
+  - Transport——netty框架
+  - Serialize 序列化、反序列化
+
+### dubbo服务暴露过程
+
+1. 首先将服务的实现封装成一个Invoker，Invoker中封装了服务的实现类。
+
+2. 将Invoker封装成Exporter，并缓存起来，缓存里使用Invoker的url作为key。
+
+3. 服务端Server启动，监听端口。（请求来到时，根据请求信息生成key，到缓存查找Exporter，就找到了Invoker，就可以完成调用。）
+
+
+
+
+
+
+
 ### Dubbo提供了哪3个关键功能？
+
 基于接口的远程调用
 
 容错和负载均衡
