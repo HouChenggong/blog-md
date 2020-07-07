@@ -1078,6 +1078,48 @@ public class ThisInnerTest {
 
 [详细解读](<https://blog.csdn.net/qq_39455116/article/details/82886328>)
 
+#### 浅拷贝方法BeanUtils.copyProperties(origin,newObject);
+
+```java
+Role role = new Role("r1", "管理员");
+User user = new User("u1", "xiyou", role);
+user.setRole(role);
+User copyUser = new User();
+BeanUtils.copyProperties(user, copyUser);
+System.out.println(user.toString());
+System.out.println(copyUser.toString());
+System.out.println(copyUser == user);
+copyUser.setName("xiyouV2");
+System.out.println(user.toString());
+role.setName("管理员V2");
+System.out.println(user.toString());
+System.out.println(copyUser.toString());
+//结果发现如果只修改copyUser的nam属性，发现user没有改变，只是copyUser改变了
+//如果修改role属性，发现user和copyUser都改变了，说明是浅拷贝，没有拷贝内部对象
+```
+
+#### 深拷贝方法SerializationUtils.clone（origin）
+
+```java
+Role role2 = new Role("r2", "管理员2");
+User user2 = new User("u2", "xiyou2", role2);
+user2.setRole(role2);
+User copyUser2 = SerializationUtils.clone(user2);
+
+System.out.println(user2.toString());
+System.out.println(copyUser2.toString());
+System.out.println(copyUser2 == user2);
+copyUser2.setName("xiyouV2");
+System.out.println(user2.toString());
+role2.setName("管理员V2");
+System.out.println(user2.toString());
+System.out.println(copyUser2.toString());
+//结果发现如果只修改copyUser的nam属性，发现user没有改变，只是copyUser改变了
+//如果修改role属性，发现user改变了，但是copyUser没有改变
+```
+
+
+
 ###  switch 对于string的支持
 
 - **switch对int的判断是直接比较整数的值**
