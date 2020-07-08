@@ -250,11 +250,58 @@ MySQL中数据的单位都是页，MySQL又采用了采样统计的方法，采�
 
 一般走错都是因为优化器在选择的时候发现，走A索引没有额外的代价，比如走B索引并不能直接拿到我们的值，还需要回到主键索引才可以拿到，多了一次回表的过程，这个也是会被优化器考虑进去的。
 
+#### 索引失效案例
+
+```mysql
+SELECT * FROM user ORDER BY age DESC
+```
+
+上述语句在 age 上加了索引，但依然造成了全表扫描，这是因为我们使用了 SELECT *,导致回表查询，MySQL 认为回表的代价比全表扫描更大，所以不选择使用索引，如果想使用到 age 的索引，我们可以用覆盖索引来代替:
+
+```mysql
+SELECT age FROM user ORDER BY age DESC
+```
+
+或者加上 limit 的条件（数据比较小）
+
+```mysql
+SELECT * FROM user ORDER BY age DESC limit 10
+```
+
+这样就能利用到索引。
+
 ### 覆盖索引
 
 查询的结果集是索引的内容，不需要进行回表操作
 
 ### 联合索引
+
+#### 使用注意
+
+- 联合索引谁放在前面，谁放在后面的问题？
+
+就是谁第一次能过滤更多的饿数据，谁放在前面
+
+```mysql
+建立联合索引时，把选择性最高的列放在最前面，比如，对于以下语句：
+
+SELECT * FROM payment WHERE staff_id = xxx AND customer_id = xxx;
+单就这个语句而言， (staff_id，customer_id) 和  (customer_id, staff_id) 这两个联合索引我们应该建哪一个呢，可以统计下这两者的选择性。
+
+SELECT 
+ COUNT(DISTINCT staff_id)/COUNT(*) as staff_id_selectivity,
+ COUNT(DISTINCT customer_id)/COUNT(*) as customer_id_selectivity,
+ COUNT(*)
+FROM payment
+结果为: ;
+
+staff_id_selectivity: 0.0001
+customer_id_selectivity: 0.0373
+COUNT(*): 16049
+从中可以看出 customer_id 的选择性更高，所以应该选择 customer_id 作为第一列。
+```
+
+
 
 ### 降序索引
 
@@ -377,6 +424,10 @@ MySQL是支持前缀索引的，也就是说，你可以定义字符串的一部
 
 上面说过覆盖索引了，覆盖索引是不需要回表的，但是前缀索引，即使你的联合索引已经包涵了相关信息，他还是会回表，因为他不确定你到底是不是一个完整的信息，就算你用完整的邮箱去查询，它还是不知道是不是完整的，所以他需要回表去判断一下。
 
+- 缺点
+  - 不能使用order by 或者group by 
+  - 也不能当作覆盖索引，需要回表操作
+
 ### 倒叙存储
 
 ### hash字符串成为另一个字段
@@ -453,3 +504,6 @@ binglog write；
 commit；
 ```
 
+## 相关解读文章
+
+[索引和磁盘IO解读](https://mp.weixin.qq.com/s/-gmAPfiKMNJgHhIZqR2C4A)
