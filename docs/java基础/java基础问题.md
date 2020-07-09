@@ -638,12 +638,12 @@ private StringBuilder prepareBuilder() {
 
 #### String.intern()
 
-把结果保存到原空间，只有调用的时候才会去存储
+把结果保存到字符串常量池，只有调用的时候才会去存储
 
 ```
-String a="xxx";//会存储到元空间
-String b=new String("xxx1");//不会存储到元空间，再堆中存储
-b.intern();//会把b的string类型存储到元空间
+String a="xxx";//会存储到字符串常量池
+String b=new String("xxx1");//不会存储到字符串常量池，再堆中存储
+b.intern();//会把b的string类型存储到字符串常量池
 ```
 
 
@@ -708,8 +708,6 @@ String 中的对象是不可变的，也就可以理解为常量，线程安全�
 
 
 ### StringBuffer和StringBuilder的扩容问题？
-
-### StringBuilder 和 StringBuffer 的扩容问题
 
 我相信这个问题很多同学都没有注意到吧，其实 StringBuilder 和 StringBuffer 存在扩容问题，先从 StringBuilder 开始看起
 
@@ -890,20 +888,28 @@ hashcode有自己的一套算法，当然一个对象无论计算多少次，has
 
 [为啥只有值传参](<https://blog.csdn.net/qq_39455116/article/details/83617271>)
 
-下面两种情况对user的修改都会影响到真实的数据值，为啥？
-
-引入对象指向的都是同一个指针
+下面三种种情况的后两种的修改都会影响到真实的数据值，为啥？
 
 ```java
-    public static   void  setA(User user){
-        user.setName("xxx");
-    }   
-
-public static   void  setA(User user){
-        User a=user;
-        a.setName("xxx");
+    public  static void test(Role role){
+        //role的结果不变
+      //引用虽然拷贝了，但是它马上把这个引用指向了另一块内存地址，所以不影响原始对象
+        role=new Role("222","xxxx");
+    }
+    public  static void test2(Role role){
+      //拷贝的是引用的拷贝（引用的再次拷贝）,指向了同一块内存地址，对user的修改影响实际的值
+        Role role1=role;
+        role1.setName("xxxxxx");
+        //最后role的结果改变了
+    }
+    public  static void test3(Role role){
+        //role的结果改变
+      //拷贝的是引用,指向了同一块内存地址，对user的修改影响实际的值
+        role.setName("xxxxxx");
     }
 ```
+
+即：**一个方法的引用传参可以修改原来的内存地址的值，但是不能让它指向一个新的内存地址**
 
 总结：
 
@@ -916,11 +922,9 @@ A:如果是对基本数据类型的数据进行操作，
     由于原始内容和副本都是存储实际值，并且是在不同的栈帧区，
     因此形参的操作，不影响原始内容。
 
-B:如果是对引用类型的数据进行操作，分两种情况，
-	(1)一种是形参和实参保持指向同一个对象地址，则形参的操作，
-		会影响实参指向的对象的内容。
-	(2)一种是形参被改动指向新的对象地址（如重新赋值引用），
-		则形参的操作，不会影响实参指向的对象的内容。
+B:如果是对引用类型的数据进行操作，其实拷贝的都是对内存地址的引用，分两种情况，
+  一种是拷贝引用，直接在引用上修改，影响原值
+  一种是拷贝引用，但是把引用指向了一个新的内存地址，所以不影响原来的值
 ```
 
 - 特殊情况

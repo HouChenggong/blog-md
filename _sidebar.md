@@ -68,7 +68,6 @@
 * 秒杀相关
   - [限流](./docs/秒杀相关/限流/限流.md)
   - 
-* [每日学习记录](./docs/每日学习记录.md)
 * [常用英文词汇](./docs/常用英文词汇.md)
 * dubbo与springCloud
   - [dubbo](./docs/springCloud和dubbo/dubbo.md)
