@@ -91,6 +91,65 @@ alter table users AUTO_INCREMENT=1000;
 1. ID要尽量用数字类型的，比如int 或者long 或者分布式雪花ID，这样建立索引的代价就比较小，引入插入的时候要进行分裂
 2. 覆盖索引的使用、联合索引的使用（最左原则）
 3. 使用函数索引
+4. 合理利用子查询
+
+```mysql
+mysql> select * from test where val=4 limit 300000,5;
++---------+-----+--------+
+| id      | val | source |
++---------+-----+--------+
+| 3327622 |   4 |      4 |
+| 3327632 |   4 |      4 |
+| 3327642 |   4 |      4 |
+| 3327652 |   4 |      4 |
+| 3327662 |   4 |      4 |
++---------+-----+--------+
+5 rows in set (15.98 sec)
+  
+  mysql> select * from test a inner join
+  (select id from test where val=4 limit 300000,5) b on a.id=b.id;
++---------+-----+--------+---------+
+| id      | val | source | id      |
++---------+-----+--------+---------+
+| 3327622 |   4 |      4 | 3327622 |
+| 3327632 |   4 |      4 | 3327632 |
+| 3327642 |   4 |      4 | 3327642 |
+| 3327652 |   4 |      4 | 3327652 |
+| 3327662 |   4 |      4 | 3327662 |
++---------+-----+--------+---------+
+5 rows in set (0.38 sec)
+
+
+
+mysql> select * from test where val=4 limit 300000,5;
++---------+-----+--------+
+| id      | val | source |
++---------+-----+--------+| 
+3327622 |   4 |      4 |
+| 3327632 |   4 |      4 |
+| 3327642 |   4 |      4 |
+| 3327652 |   4 |      4 |
+| 3327662 |   4 |      4 |
++---------+-----+--------+
+5 rows in set (26.19 sec)
+###buffer pool中关于test表有多少数据页，多少索引页，有4098个数据页，208个索引页。
+mysql> select index_name,count(*) from information_schema.INNODB_BUFFER_PAGE where INDEX_NAME in('val','primary') and TABLE_NAME like '%test%' group by index_name;
++------------+----------+
+| index_name | count(*) |
++------------+----------+
+| PRIMARY    |     4098 |
+| val        |      208 |
++------------+----------+2 rows in set (0.04 sec)
+
+
+而且这会造成一个问题：加载了很多热点不是很高的数据页到buffer pool，
+会造成buffer pool的污染，占用buffer pool的空间。遇到的问题
+
+为了在每次重启时确保清空buffer pool，我们需要关闭innodb_buffer_pool_dump_at_shutdown和innodb_buffer_pool_load_at_startup，
+这两个选项能够控制数据库关闭时dump出buffer pool中的数据和在数据库开启时载入在磁盘上备份buffer pool的数据。
+```
+
+
 
 ## Innodb结构
 

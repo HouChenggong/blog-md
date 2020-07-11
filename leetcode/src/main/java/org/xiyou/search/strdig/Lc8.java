@@ -1,5 +1,10 @@
 package org.xiyou.search.strdig;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+
 /**
  * @author xiyouyan
  * @date 2020-07-09 23:22
@@ -44,4 +49,48 @@ public class Lc8 {
         return negative ? -ans : ans;
     }
 
+    public int[] twoSum(int[] nums, int target) {
+        Arrays.sort(nums);
+        HashMap<Integer, Integer> set = new HashMap<>();
+        for (int i = 0; i < nums.length; i++) {
+            if (set.containsKey(target - nums[i])) {
+                return new int[]{i, set.get(target - nums[i])};
+            } else {
+                set.put(nums[i], i);
+            }
+        }
+        return new int[]{};
+    }
+
+    public static List<List<Integer>> threeSum(int[] nums) {
+        List<List<Integer>> all = new ArrayList<>();
+        Arrays.sort(nums);
+        for (int i = 0; i < nums.length; i++) {
+            int temp = -nums[i];
+             if(i<nums.length-1 && nums[i+1]==nums[i]){
+                 continue;
+             }
+            HashMap<Integer, Integer> set = new HashMap<>();
+            for (int j = i; j < nums.length; j++) {
+                if (set.containsKey(temp - nums[j])) {
+                    List<Integer> list = new ArrayList<>(10);
+                    list.add(nums[i]);
+                    list.add(nums[j]);
+                    list.add((temp - nums[j]));
+                    all.add(list);
+                } else {
+                    set.put(nums[j], j);
+                }
+            }
+            while (i<nums.length-1 && nums[i+1]==nums[i]){
+                i++;
+            }
+        }
+        return all;
+    }
+
+    public static void main(String[] args) {
+        int arr[]=new int[]{-1,0,1,2,-1,-4};
+        System.out.println(threeSum(arr));
+    }
 }
