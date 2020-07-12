@@ -91,7 +91,17 @@ alter table users AUTO_INCREMENT=1000;
 1. ID要尽量用数字类型的，比如int 或者long 或者分布式雪花ID，这样建立索引的代价就比较小，引入插入的时候要进行分裂
 2. 覆盖索引的使用、联合索引的使用（最左原则）
 3. 使用函数索引
-4. 合理利用子查询
+4. 判断是否存在优化
+
+```mysql
+select count(*) from xxx where a=xxx and b=xxx
+##改为让数据库遇到一个就返回
+select 1 from xxx where a=xx and b=xx limit 1
+```
+
+
+
+1. 合理利用子查询
 
 ```mysql
 mysql> select * from test where val=4 limit 300000,5;
