@@ -327,9 +327,17 @@ set k2 22
 
 ### redis事务
 
+事务流程：1.watch监听多个值或者一个值 2.开启一个队列，把命令存入队列 3.exec4. 	如果被监听的值发生改变，则不执行exec
+
 Redis 通过 MULTI、EXEC、WATCH 等命令来实现事务(transaction)功能。事务提供了一种将多个命令请求打包，然后一次性、按顺序地执行多个命令的机制，并且在事务执行期间，服务器不会中断事务而改去执行其他客户端的命令请求，它会将事务中的所有命令都执行完毕，然后才去处理其他客户端的命令请求。
 
 **redis同一个事务中如果有一条命令执行失败，其后的命令仍然会被执行，没有回滚**
+
+#### redis事务watch
+
+WATCH命令是在MULTI命令之前执行的，表示监视任意数量的key，与它对应的命令就是UNWATCH命令，取消监视的key。
+
+WATCH命令有点**「类似于乐观锁机制」**，在事务执行的时候，若是被监视的任意一个key被更改，则队列中的命令不会被执行，直接向客户端返回(nil)表示事务执行失败。
 
 ### redis分布式锁
 
@@ -543,6 +551,14 @@ Redis可以使用主从同步，从从同步。第一次同步时，主节点做
 部分复制的原理主要是靠主从节点分别维护一个 **复制偏移量**，有了这个偏移量之后断线重连之后一比较，之后就可以仅仅把从服务器断线之后确实的这部分数据给补回来了。
 
  ### 哨兵
+
+搭建教程，注意docker-compose up -d
+
+
+
+在 Compose 中你可以使用 YAML 文件来配置你的应用服务。然后，只需要一个简单的命令，就可以创建并启动你配置的所有服务。
+
+[https://www.funtl.com/zh/apache-dubbo-codeing/Redis-Sentinel-%E9%9B%86%E7%BE%A4%E9%83%A8%E7%BD%B2.html#%E6%90%AD%E5%BB%BA-sentinel-%E9%9B%86%E7%BE%A4](https://www.funtl.com/zh/apache-dubbo-codeing/Redis-Sentinel-集群部署.html#搭建-sentinel-集群)
 
 Redis Sentinal着眼于高可用，在master宕机时会自动将slave提升为master，继续提供服务。
 
