@@ -43,7 +43,7 @@
   * [CAS](./docs/多线程/CAS.md)
   * [volatile](./docs/多线程/volatile和Happens-Before原则.md)
   * [synchronized](./docs/多线程/synchornized.md)
-  * [threadLocal](./docs/多线程/threadLocal.md)
+  * [threadLocal](./docs/多线程/ThreadLocal.md)
 
 
 * spring

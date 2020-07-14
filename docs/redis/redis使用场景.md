@@ -333,6 +333,13 @@ Redis 通过 MULTI、EXEC、WATCH 等命令来实现事务(transaction)功能。
 
 **redis同一个事务中如果有一条命令执行失败，其后的命令仍然会被执行，没有回滚**
 
+```
+redis错误分为：语法错误，比如1/0的形式，则抛出异常，其它命令正常执行
+编译错误，比如setget key，根本不存在的命令，但是如果用Java的话一般不会出现
+```
+
+
+
 #### redis事务watch
 
 WATCH命令是在MULTI命令之前执行的，表示监视任意数量的key，与它对应的命令就是UNWATCH命令，取消监视的key。

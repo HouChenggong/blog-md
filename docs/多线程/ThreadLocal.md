@@ -1,6 +1,12 @@
 ## 文章推荐
 
-[threadLocal源码分析](https://juejin.im/post/5eb52dd2f265da7bb65fb909)
+[threadLocal源码分析，这是一定要看的](https://juejin.im/post/5eb52dd2f265da7bb65fb909)
+
+[源码分析2](https://mp.weixin.qq.com/s/NSNRw6j6Pqzq93WkX01PHA)
+
+![](./img/threadLocal.png)
+
+
 
 ## java 四种引用类型
 
@@ -250,6 +256,20 @@ class User {
 - 不需要加锁，执行效率高
 - 更加节省内存，节省开销
 - 免去传参的繁琐，降低代码耦合度
+
+ThreadLocal顾名思义它是local variable（线程局部变量）。它的功用非常简单，就是为每一个使用该变量的线程都提供一个变量值的副本，是每一个线程都可以独立地改变自己的副本，而不会和其它线程的副本冲突。从线程的角度看，就好像每一个线程都完全拥有该变量。
+
+### 线程内共享数据
+
+
+
+### 不同线程数据隔离如何实现的？
+
+ThreadLocal 是如何做到多个线程对同一对象 set 操作，但是 get 获取的值还都是每个线程 set 的值呢 ？
+
+- 简单理解
+
+实际上ThreadLocal其实就是一个key，存放在Thread类里面的map里面的一个key,每一个线程都有一个map，这个map的key就是ThreadLocal，这个ThreadLocal作为key不会发生改变，但是value可以 由我们的线程自定义，所以不同的线程访问同一个ThreadLocal，相当于访问不同的map，只是map的key一样，但是值又不一样，所以能实现线程隔离。
 
 
 
