@@ -10,7 +10,7 @@
 
 延时处理消息
 
-![](E:\2020\code\springboot_dubbo\tools\md\秒杀相关\MQ\img\dead.png)
+![](.\img\dead.png)
 
 所以死信队列有一个自己的队列和交换机，还有真正的队列和交换机
 
