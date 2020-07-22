@@ -199,6 +199,14 @@ Buffer Pool 采用基于 LRU（least recently used） 的算法来管理内存�
 
 ![](./img/bufferPool.jpg)
 
+- MYSQL将LRU链表分为了Young（New）区，和Old区。
+- 当数据首次加载时，会先被加载到Old区的头部。如果该数据页在之后再被用到，那么它才有机会晋升到Young区成为热点数据。
+- 针对全表扫描和磁盘预读，它们查询时的得到的数据页，**插入点都在Old的头部**，不会影响Young区的热点数据，且之后如果这部分数据没有被用到，就会被新数据淘汰掉
+
+
+
+
+
 ### mysql——ChangeBuffer
 
 上面提到过，如果内存里没有对应「页」的数据，MySQL 就会去把数据从磁盘里 load 出来，如果每次需要的「页」都不同，或者不是相邻的「页」，那么每次 MySQL 都要去 load，这样就很慢了。
@@ -576,3 +584,17 @@ commit；
 ## 相关解读文章
 
 [索引和磁盘IO解读](https://mp.weixin.qq.com/s/-gmAPfiKMNJgHhIZqR2C4A)
+
+### mysql幻读
+
+快照读：select
+
+当前读：select for update.或者update 或者insert或者delete
+
+- 在快照读情况下，MySQL通过mvcc来避免幻读。
+  - 解决的是别的事物插入了一条记录，但是我查询不出来的问题
+- 在当前读情况下，MySQL通过next-key来避免幻读
+  - 解决的是别的事物插入了一条数据，但是我无法插入的问题
+  - 通过select for update来解决
+  - 根本是next-key锁
+- gap lock和next-key lock 就是为了防止当前读出现幻读，因为它们加了锁，其他事务就无法修改这些数据了。这两个锁主要区别是看事务需不需要锁定某个索引记录，需要的话就是next-key lock，不需要就gap lock。

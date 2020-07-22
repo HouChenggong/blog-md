@@ -1,6 +1,6 @@
 # MySQL锁的理解
 
-![](E:\2020\code\springboot_dubbo\tools\md\mysql\img\MySQL索引.png)
+![](.\img\MySQL索引.png)
 
 
 
@@ -43,7 +43,7 @@ update user  set  age  =   10   where  id  >   49 ;
 
 不同的锁锁定的位置是不同的，比如说记录锁只锁住对应的记录，而间隙锁锁住记录和记录之间的间隔，Next-Key Lock 则所属记录和记录之前的间隙。不同类型锁的锁定范围大致如下图所示。
 
-![](E:\2020\code\springboot_dubbo\tools\md\mysql\img\行锁类型.png)
+![](.\img\行锁类型.png)
 
 ### 记录锁
 
