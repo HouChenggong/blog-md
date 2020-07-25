@@ -105,6 +105,7 @@ select 1 from xxx where a=xx and b=xx limit 1
 
 ```mysql
 mysql> select * from test where val=4 limit 300000,5;
+扫描前30005条，丢掉前面的30000条
 +---------+-----+--------+
 | id      | val | source |
 +---------+-----+--------+
@@ -157,6 +158,21 @@ mysql> select index_name,count(*) from information_schema.INNODB_BUFFER_PAGE whe
 
 为了在每次重启时确保清空buffer pool，我们需要关闭innodb_buffer_pool_dump_at_shutdown和innodb_buffer_pool_load_at_startup，
 这两个选项能够控制数据库关闭时dump出buffer pool中的数据和在数据库开启时载入在磁盘上备份buffer pool的数据。
+```
+
+2. 合理利用>条件
+
+```sql
+# 第一页
+SELECT * FROM `year_score` where `year` = 2017 ORDER BY id limit 0, 20;
+
+# 第N页
+SELECT * FROM `year_score` where `year` = 2017 ORDER BY id limit (N - 1) * 20, 20;
+
+改为：
+
+# XXXX 代表已知的数据
+SELECT * FROM `year_score` where `year` = 2017 and id > XXXX ORDER BY id limit 20;
 ```
 
 
@@ -378,7 +394,46 @@ COUNT(*): 16049
 从中可以看出 customer_id 的选择性更高，所以应该选择 customer_id 作为第一列。
 ```
 
+```mysql
+DROP TABLE IF EXISTS `t`;
+CREATE TABLE `t` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `mobile` bigint(20) DEFAULT NULL,
+  `password` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `username` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `sex` tinyint(4) NOT NULL DEFAULT '1',
+  `birthday` datetime DEFAULT NULL,
+  `amount` decimal(18,2) DEFAULT NULL,
+  `ismaster` tinyint(1) DEFAULT NULL,
+  `istest` bit(1) DEFAULT NULL,
+  `updatetime` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `san_index` (`username`,`password`,`updatetime`)
+) ENGINE=InnoDB AUTO_INCREMENT=101709 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+SET FOREIGN_KEY_CHECKS = 1;
+```
+
+- 那么单独使用password会不会有索引呢？
+  - 答案：不会
+- updatetime在前，有木有索引呢？
+  - 答案：有索引
+
+```mysql
+explain  select  * from  t where   username="吴德丹"  and updatetime='2020-07-25 09:58:39'   ;
+1	SIMPLE	t		ref	san_index	san_index	259	const	1	10.00	Using index condition
+##下面的语句也是有索引的
+explain  select  * from  t where updatetime='2020-07-25 09:58:39'  and username="吴德丹"  ;
+##答案是有索引
+1	SIMPLE	t		ref	san_index	san_index	259	const	1	10.00	Using index condition
+
+###下面的就没有索引了
+explain  select  * from  t where password="3cbaf928375e5aede690fd40e00faa56";
+1	SIMPLE	t		ALL					101267	10.00	Using where
+```
+
+- Username =xxx and updatetime=xxx和updatetime=xxx and username=xxx用到的索引底层一样吗
+- 
 
 ### 降序索引
 
