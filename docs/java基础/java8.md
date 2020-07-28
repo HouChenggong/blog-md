@@ -76,3 +76,47 @@ Lambda 表达式简化了匿名内部类的形式，可以达到同样的效果�
                   .thenComparing(CodeRulePackage::getNodeName));
 ```
 
+### reduce
+
+[一个简单的介绍](https://blog.csdn.net/zhang89xiao/article/details/77164866)
+
+```java
+List<Integer> list = Arrays.asList(1,2,3,4,5,6,7,8,9,10);
+// T reduce(T identity, BinaryOperator<T> accumulator);
+//0是identity参数，用来指定Stream循环的初始值。如果Stream为空，就直接返回该值。
+Integer sum = list.stream().reduce(0, (x,y) -> x+y);
+System.out.println(sum);//55
+```
+
+### Optional
+
+```java
+@Test
+public void whenEmptyValue_thenReturnDefault() {
+    User user = null;
+    User user2 = new User("anna@gmail.com", "1234");
+  //如果user为空，则返回user2
+    User result = Optional.ofNullable(user).orElse(user2);
+
+    assertEquals(user2.getEmail(), result.getEmail());
+}
+//不为空直接返回user
+User result = Optional.ofNullable(user).orElseGet( () -> user2);
+```
+
+两个 *Optional*  对象都包含非空值，两个方法都会返回对应的非空值。不过，*orElse()* 方法仍然创建了 *User* 对象。**与之相反，\*orElseGet()\* 方法不创建 \**\*User\**\*** **对象。**
+
+在执行较密集的调用时，比如调用 Web 服务或数据查询，**这个差异会对性能产生重大影响**。
+
+### 
+
+```
+@Test
+public void givenPresentValue_whenCompare_thenOk() {
+    User user = new User("john@gmail.com", "1234");
+    logger.info("Using orElse");
+    User result = Optional.ofNullable(user).orElse(createNewUser());
+    logger.info("Using orElseGet");
+    User
+```
+

@@ -277,7 +277,7 @@ ThreadLocal 是如何做到多个线程对同一对象 set 操作，但是 get �
 
 [一个很棒的讲解](https://mp.weixin.qq.com/s/XvTV3VuEn94i9ApJFPA2hA)
 
-
+### 数据结构
 
 在Thread类内部有有ThreadLocal.ThreadLocalMap threadLocals = null;这个变量，它用于存储ThreadLocal，因为在同一个线程当中可以有多个ThreadLocal，并且多次调用get()所以需要在内部维护一个ThreadLocalMap用来存储多个ThreadLocal
 
@@ -321,7 +321,16 @@ public class ThreadLocal<T> {
 
 ![](./img/threadLocal.jpg)
 
+### set寻址过程
 
+ThreadLocalMap在存储的时候会给每一个ThreadLocal对象一个threadLocalHashCode，在插入过程中，根据ThreadLocal对象的hash值，定位到table中的位置i，**int i = key.threadLocalHashCode & (len-1)**。
+
+1. 如果计算出的位置上Entry是空的，则放进去
+2. 如果计算出的位置上的key值刚好是要设置的key，则替换value
+3. 如果不为空，而且key不相等，则向后找，直到找到一个null 的Entry位置为止
+   - 所以在ge t的时候，先定位到hash值对应的位置，然后判断是否key相等，不一致则向后面找
+   - 同时get的时候如果遇到过期桶，则清理，并把后面的数据向前移动
+4. 在找到Entry为null的槽位之前，遇到了过期的Entry,占用过期桶
 
 ### set、get、remove
 
@@ -341,11 +350,13 @@ public class ThreadLocal<T> {
 
 ## 各种坑
 
-### 为啥要用ThreadLocal？
-
-以事物的数据库连接为例，不同的线程要执行同一个方法，但是要给每个线程一个独立的连接，一个相对其它线程隔离的连接
-
 ### 为啥ThreadLocal key不用强引用？
+
+总结：key如果不设置成弱引用，就会发生key发生内存泄漏的情况。
+
+因为如果线程一直运行，所以key会一直存在，所以value也会一直存在，所以key和value都会发生内存泄漏。但是如果我们把key设置成弱引用，发生垃圾回收的时候，key会变成null，key就不会发生内存泄漏，但是value还是会存在内存泄漏
+
+
 
 - 如果是Entry强引用，那么会出现一个问题，当一个方法执行结束，栈帧销毁，ThreadLocal为空的时候，但是当前线程的ThreadLocalMap里面的entry中还存在其引用，所以ThreadLocal对象肯定不能进行回收，肯定会内存泄漏
 - 而弱引用只要发生垃圾回收，就会回收，所以作为弱引用的Entry key的ThreadLocal可以被回收，但是作为value却再也没有对象能访问到了，依然存在内存泄漏。
@@ -465,3 +476,7 @@ public class ThreadLocalNPE {
 ### 优先使用框架的支持，而不是自己创造
 
 例如在Spring框架中，如果可以使用RequestContextHolder，那么就不需要自己维护ThreadLocal，因为自己可能会忘记调用remove()方法等，造成内存泄漏。
+
+### ThreadLocal传递不支持
+
+InheritableThreadLocal可以支持
