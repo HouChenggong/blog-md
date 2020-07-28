@@ -498,6 +498,21 @@ mysql> EXPLAIN   SELECT * from student WHERE  school ='12' and class like '%1%';
 
 ```
 
+### in和exist的区别
+
+```java
+ 
+
+/*
+      1.什么时候用EXISTS，什么时候用IN？
+          主表为employees，从表为dept_emp，在主表和从表都对关联的列emp_no建立索引的前提下：
+              当主表比从表大时，IN查询的效率较高；
+              当从表比主表大时，EXISTS查询的效率较高；
+        原因如下：
+            in是先执行子查询，得到一个结果集，将结果集代入外层谓词条件执行主查询，子查询只需要执行一次
+            exists是先从主查询中取得一条数据，再代入到子查询中，执行一次子查询，判断子查询是否能返回结果，主查询有多少条数据，子查询就要执行多少次
+```
+
 
 
 ### ChangeBffer
