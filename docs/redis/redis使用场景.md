@@ -388,9 +388,95 @@ WATCH命令有点**「类似于乐观锁机制」**，在事务执行的时候�
 
 list还有个指令叫`blpop`，在没有消息的时候，它会阻塞住直到消息到来。
 
+```java
+public class EasyConsumer extends Thread{
+    private Jedis jedis;
+    private String queueName;
+    public EasyConsumer(String ip, int port, String queueName) {
+        super();
+        jedis = new Jedis(ip, port);
+        this.queueName = queueName;
+    }
+    @Override
+    public void run() {
+        while (true) {
+          //参数0表示一直阻塞下去，直到List出现数据
+            List<String> list = jedis.brpop(0, this.queueName);
+            for(String s : list) {
+                System.out.println("这里是消费者："+s);
+            }
+        }
+    }
+    @Override
+    protected void finalize() throws Throwable {
+        super.finalize();
+        jedis.close();
+    }
+
+    public static void main(String[] args) {
+        EasyConsumer consumer = new EasyConsumer("127.0.0.1", 6379, "message_queue");
+        consumer.start();
+    }
+}
+
+```
+
+
+
 ### redis延时消息队列
 
-使用sortedset，拿时间戳作为score，消息内容作为key调用zadd来生产消息，消费者用`zrangebyscore`指令获取N秒之前的数据轮询进行处理。
+使用sortedset，拿时间戳作为score，消息内容作为key调用zadd来生产消息，消费者用`zrangebyscore`指令获取N秒之前的数据轮询进行处理。然后再用zrem把数据删除了，可以用lua脚本实现整合中一起
+
+```java
+public class DelayQueue<T> {
+
+    static class TaskItem<T> {
+        public String id;
+        public T msg;
+    }
+
+    private Type taskType = new TypeReference<TaskItem<T>>() {
+    }.getType();
+
+    private Jedis jedis;
+    private String queueName;
+
+    public DelayQueue(Jedis jedis, String queueName) {
+        this.jedis = jedis;
+        this.queueName = queueName;
+    }
+
+    public void delay(T msg, long delayTime) {
+        TaskItem<T> task = new TaskItem<>();
+        task.id = UUID.randomUUID().toString();
+        task.msg = msg;
+        jedis.zadd(queueName, System.currentTimeMillis() + delayTime, JSON.toJSONString(task));
+    }
+
+    public void loop() {
+        while (!Thread.interrupted()) {
+          //dqueue名称,min最小值,max最大值,偏移量，数量
+            Set<String> set = jedis.zrangeByScore(queueName, 0, System.currentTimeMillis(), 0, 1);
+            if (set.isEmpty()) {
+                try {
+                    Thread.sleep(500);
+                } catch (InterruptedException e) {
+                    break;
+                }
+                continue;
+            }
+
+            String s = set.iterator().next();
+          //将set的元素删除
+            if (jedis.zrem(queueName, s) > 0) {
+                TaskItem<T> task = JSON.parseObject(s, taskType);
+                System.out.println(task.msg);
+            }
+        }
+    }
+```
+
+
 
 ### redis发布订阅
 
@@ -515,13 +601,14 @@ public class LRUCache<K, V> extends LinkedHashMap<K, V> {
 
 - 缓存雪崩：大规模的缓存数据同一时间失效，请求直接打到了数据库，导致数据库挂掉
   
-- 解决方案：缓存时间添加random或者不设置失效时间，有更新操作即可
+  - 解决方案：缓存时间添加random或者不设置失效时间，有更新操作即可
+  - 集群高可用，防止宕机
   
 - 缓存穿透：越过redis直接把请求打到了MySQL
 
   比如：id=-1或者不存在的id
 
-  - 缓存无效key
+  - 缓存无效key，当这个值缓存中不存在，再去查询数据库是否存在，如果也不存在，缓存它
   - 布隆过滤器
   - IP限制，假如一个用户反复请求
 
@@ -731,3 +818,4 @@ Redis Cluster 使用分片机制，在内部分为 16384 个 slot 插槽，分�
 - 槽 0-3 位于 node1；4-7 位于 node2；以此类推....
 
 如果此时删除 `node2`，只需要将槽 4-7 重新分配即可，例如槽 4-5 分配给 `node1`，槽 6 分配给 `node3`，槽 7 分配给 `node4`；可以看出删除 `node2` 后，数据在其他节点的分布仍然较为均衡。
+
