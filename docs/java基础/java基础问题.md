@@ -239,6 +239,32 @@ public void consumer(){
 
 [一个比较好的案例](https://blog.csdn.net/qq_39455116/article/details/87101633)
 
+#### 6. wait()之后的代码会被执行吗？
+
+- 答案是：不能被执行
+
+```java
+        public  static  void test(){
+        Object o=new Object();
+            new Thread(()->{
+                synchronized (o){
+                    System.out.println("1");
+                    try {
+                        o.wait();
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                    System.out.println("2");
+                    System.out.println("3");
+                }
+
+
+            },"线程1").start();
+        }
+```
+
+
+
 ## String 
 
 ### string常见小功能

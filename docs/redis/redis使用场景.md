@@ -65,7 +65,7 @@ string hash list set zset(有序)
 
 HyperLogLog Pub/Sub BloomFilter
 
-### 过期时间
+### [过期时间](http://www.redis.cn/commands/expire.html)
 
 如果假设你设置了一批 key 只能存活1个小时，那么接下来1小时后，redis是怎么对这批key进行删除的？
 
@@ -74,7 +74,21 @@ HyperLogLog Pub/Sub BloomFilter
 通过名字大概就能猜出这两个删除方式的意思了。
 
 - **定期删除**：redis默认是每隔 100ms 就**随机抽取**一些设置了过期时间的key，检查其是否过期，如果过期就删除。注意这里是随机抽取的。为什么要随机呢？你想一想假如 redis 存了几十万个 key ，每隔100ms就遍历所有的设置过期时间的 key 的话，就会给 CPU 带来很大的负载！
+
+  - 这些过期的key，其实存在一个特殊的区域，redis不用全盘扫描，只要扫描特定的这个区域即可
+
+- 定期删除官方版本介绍：[官网](http://www.redis.cn/commands/expire.html)
+
+  具体就是Redis每秒10次做的事情：也就是每隔100毫秒
+
+  1. 测试随机的20个keys进行相关过期检测。
+  2. 删除所有已经过期的keys。
+  3. 如果有多于25%的keys过期，重复步奏1.
+
+  这是一个平凡的概率算法，基本上的假设是，我们的样本是这个密钥控件，并且我们不断重复过期检测，直到过期的keys的百分百低于25%,这意味着，在任何给定的时刻，最多会清除1/4的过期keys。
+
 - **惰性删除** ：定期删除可能会导致很多过期 key 到了时间并没有被删除掉。所以就有了惰性删除。假如你的过期 key，靠定期删除没有被删除掉，还停留在内存里，除非你的系统去查一下那个 key，才会被redis给删除掉。这就是所谓的惰性删除，也是够懒的哈！
+
 - 但是仅仅通过设置过期时间还是有问题的。我们想一下：如果定期删除漏掉了很多过期 key，然后你也没及时去查，也就没走惰性删除，此时会怎么样？如果大量过期key堆积在内存里，导致redis内存块耗尽了。怎么解决这个问题呢？ **redis 内存淘汰机制。**
 
 
@@ -180,6 +194,13 @@ Redis在去重计算时怎么和HyperLogLog算法联系起来呢？这个问题�
  
 
 ### 布隆过滤器
+
+- 期望插入的值的个数和错误率
+
+```java
+BloomFilter<String> stringBloomFilter =
+   BloomFilter.create(Funnels.stringFunnel(Charset.forName("utf-8")), 1000, 0.001);
+```
 
 比hashMap更节省空间
 
@@ -424,6 +445,9 @@ public class EasyConsumer extends Thread{
 
 
 ### redis延时消息队列
+
+- 时间戳是：当前时间+要延时的时间
+- 获取的时候：获取当前时间以前的即可
 
 使用sortedset，拿时间戳作为score，消息内容作为key调用zadd来生产消息，消费者用`zrangebyscore`指令获取N秒之前的数据轮询进行处理。然后再用zrem把数据删除了，可以用lua脚本实现整合中一起
 
