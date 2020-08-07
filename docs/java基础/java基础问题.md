@@ -263,7 +263,17 @@ public void consumer(){
         }
 ```
 
+#### sleep和yield的区别
 
+- 相同：都会释放CPU
+
+- 不同
+
+  - sleep() 方法给其他线程运行机会时不考虑线程的优先级；yield() 方法只会给相同优先级或更高优先级的线程运行的机会
+
+  - 线程执行 sleep() 方法后进入阻塞状态；线程执行 yield() 方法转入就绪状态，可能马上又得得到执行
+  - sleep() 方法声明抛出 InterruptedException；yield() 方法没有声明抛出异常
+  - sleep() 方法需要指定时间参数；yield() 方法出让 CPU 的执行权时间由 JVM 控制
 
 ## String 
 
