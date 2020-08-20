@@ -79,16 +79,28 @@ public class RedPacketUtil {
         return rpList;
     }
 
-    public static void main(String[] args) {
-        RedPacketUtil util = new RedPacketUtil();
-        List<Float> result = util.splitRedPacket(200, 10);
-        System.out.println(result);
-        //验证金额总数
-        float sum = 0;
-        for (float i : result) {
-            sum = sum + i;
+        public  static int countBinarySubstrings(String s) {
+            List<Integer> counts = new ArrayList<Integer>();
+            int ptr = 0, n = s.length();
+            while (ptr < n) {
+                char c = s.charAt(ptr);
+                int count = 0;
+                while (ptr < n && s.charAt(ptr) == c) {
+                    ++ptr;
+                    ++count;
+                }
+                counts.add(count);
+            }
+            int ans = 0;
+            for (int i = 1; i < counts.size(); ++i) {
+                ans += Math.min(counts.get(i), counts.get(i - 1));
+            }
+            return ans;
         }
-        System.out.println(sum);
+
+
+    public static void main(String[] args) {
+        System.out.println(countBinarySubstrings("00111011"));
     }
 }
 
