@@ -120,3 +120,7 @@ public void givenPresentValue_whenCompare_thenOk() {
     User
 ```
 
+### list转换为string
+
+String  str=String.join(";",listOrSet);
+
