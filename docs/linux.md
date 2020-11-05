@@ -1,5 +1,43 @@
 ## linux命令
 
+#### top文件相关
+
+- df -h 查询磁盘占用情况
+
+```java
+df -h 
+文件系统        容量  已用  可用 已用% 挂载点
+/dev/vda1        99G   84G  9.8G   90% /
+devtmpfs        7.8G     0  7.8G    0% /dev
+tmpfs           7.8G   24K  7.8G    1% /dev/shm
+tmpfs           7.8G  452K  7.8G    1% /run
+tmpfs           7.8G     0  7.8G    0% /sys/fs/cgroup
+tmpfs           1.6G     0  1.6G    0% /run/user/0
+tmpfs           1.6G     0  1.6G    0% /run/user/10000
+tmpfs           1.6G     0  1.6G    0% /run/user/19481
+tmpfs           1.6G     0  1.6G    0% /run/user/19685
+```
+
+- du -h --max-depth=1
+
+```java
+du -h --max-depth=1
+
+查询当前目录文件信息
+
+# du -h --max-depth=1
+9.0M    ./modules
+74G ./data
+28M ./lib
+8.2M    ./config
+1.9G    ./logs
+9.3M    ./plugins
+276K    ./bin
+76G .
+```
+
+
+
 ## 文件操作
 
 - mkdir
@@ -23,6 +61,17 @@
   tail -n 10 example.txt
     tail -f xxx.txt自动显示新增内容，默认10行，但是可以设置
   ```
+
+- ```
+  // 查询日志中带有xxxText的
+  tail -f xxx.log | grep xxxText
+  // 一样查询
+  cat xxx.log | grep xxxText
+  ```
+
+  
+
+
 
 ### sort命令
 
