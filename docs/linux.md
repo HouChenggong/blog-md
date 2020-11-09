@@ -102,6 +102,13 @@ chmod 777 file.java
 
 
 
+```
+//给用户是qianxun的人而去用户组是qianxun的，手语/DATA/目录的读写权限
+chown -R qianxun:qianxun /DATA/
+```
+
+
+
 ### kill -9（强制）  -15(默认)
 
 
