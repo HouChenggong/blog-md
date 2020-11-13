@@ -1,4 +1,4 @@
-### ES ContextSuggest根据不同类别进行自动补全
+### ES ContextSuggest根据上下文进行自动补全
 
 - 个人ES版本6.4.3
 
@@ -25,6 +25,14 @@
 1、比如我们有很多问题，统一都用standardQuestion这个字段存储，但是这个问题可能属于不同的应用app，所以对于每一个问题都有一个appId。也就是说同一个问题（字面上一样的）可能在不同的app中都存在，如果直接搜索则召回所有的，显然是不能满足我们根据appId来过滤问题的需求。
 
 2、但是我们知道ES-Suggest是存储在FST中的，FST类似一个Map是没有过滤appId的功能的，根本没有过滤功能，我们怎么办呢？
+
+​	我们可以选择将appID拼到前缀里面，类似xxxAppId_xxxstandardQuestion
+
+​	比如：下面这样，但是这样太麻烦，而且不具备扩展性，如果下次我们要根据appId和userId进行过滤怎么办？
+
+```
+45_微信公众号如何申请、46_微信公众号如何申请、47_微信公众号如何申请
+```
 
 3、天无绝人之路，ES提供了ContentSuggest的功能，就是在指定索引的时候，设置一个分类，我们查询的时候就可以根据这个分类进行查询了
 
@@ -228,7 +236,7 @@ GET question_index/doc/_search
 
 
 
-#### 测试自动补全基于类型的查询
+#### 测试基于上下文的自动补全
 
 ```java
 POST question_index/_search
@@ -330,4 +338,101 @@ POST question_index/_search
 ```
 
 ### 基于Java实现ContextSuggest
+
+上面我们测试了基于上下文字段时间的contextSuggest功能，下面我们就结合Java来具体实现下
+
+- 类名
+
+```
+//我想在ES-contextSuggest的时候，根据appId进行过滤standardQuestion，那我的mapping该如何写呢
+@Data
+@Document(indexName = "question_index",
+        type = "question_index",
+        shards = 5, replicas = 1)
+public class QuestionIndex {
+    @Id
+    @Field(type = FieldType.Keyword)
+    private String id;
+
+ 
+    @Field(type = FieldType.keyword)
+    private Long appId;
+
+    @Field(type = FieldType.Text, analyzer = "ik_smart")
+    private String standardQuestion;
+```
+
+
+
+
+
+#### contextSuggest 坑点
+
+- contexts里面的字段必须存在，而且类型必须是：keyword或者text否则报错，也就是我们的appId不能说int或者是long 类型，必须是keyword和text的一种
+- 由于ES和本地IDEA的字段类型 不一致，如果直接在ES里面设置completion,那么启动就会报错，解决方案是：先启动，然后删除索引，重新构建索引即可
+
+```java
+ PUT question_index
+{
+    "mappings":{
+        "knowledge_test":{
+            "properties":{
+                "id":{
+                    "type":"keyword"
+                },
+                "appId":{
+                    "type":"keyword"
+                },
+                "standardQuestion":{
+                    "type":"completion",
+                    "analyzer":"ik_smart",
+                    "contexts":[
+                        {
+                            "name":"appId",
+                            "type":"category",
+                            "path":"appId"
+                        }
+                    ]
+                }
+            }
+        }
+    }
+}
+```
+
+#### 完整的searchSourceBuilder
+
+```java
+    public SearchSourceBuilder getSuggestSourceBuilder(String q, Long appId) {
+        SearchSourceBuilder sourceBuilder = new SearchSourceBuilder();
+        // 创建CompletionSuggestionBuilder
+        CompletionSuggestionBuilder textBuilder = SuggestBuilders.completionSuggestion("standardQuestion") // 指定字段名
+                .size(10) // 设定返回数量
+                .skipDuplicates(true); // 去重
+        // 配置context
+        CategoryQueryContext categoryQueryContext = CategoryQueryContext.builder().setCategory(String.valueOf(appId)).build();
+        Map<String, List<? extends ToXContent>> contexts = new HashMap<>();
+        List<CategoryQueryContext> list = new ArrayList<>();
+        list.add(categoryQueryContext);
+        contexts.put("appId", list);
+        textBuilder.contexts(contexts); // 设置contexts
+        // 创建suggestBuilder并将completionBuilder添加进去
+        SuggestBuilder suggestBuilder = new SuggestBuilder();
+        suggestBuilder.addSuggestion("standardQuestionSuggest", textBuilder)
+                .setGlobalText(q);
+        sourceBuilder.suggest(suggestBuilder);
+        log.info("knowledge search json:{}", sourceBuilder.toString());
+        return sourceBuilder;
+    }
+```
+
+```
+ SearchRequest request = new SearchRequest();
+  request.indices("question_index");
+                request.types("question_index");
+                 request.source(getSuggestSourceBuilder(q,appId));
+                 
+                 
+                 
+```
 

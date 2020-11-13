@@ -28,3 +28,29 @@ String questionId = ObjectId.get().toString();
 ObjectId id = new ObjectId(questionId);
 query.addCriteria("id").lt(id));
 ```
+
+
+
+### Java中指定索引
+
+```java
+@Document(collection = "user")
+@Data
+@CompoundIndexes({
+        @CompoundIndex(name = "idx_app_id_username_chat_time", def = "{'app_id': 1, 'user_name': 1,'chat_time':1}", unique = true)
+})
+public class User {
+
+    @Id
+    private String id;
+
+    @Field("user_name")
+    private String userName;
+  
+    @Field("app_id")
+    private Long appId;
+
+    @Field("chat_time")
+    private Long chatTime;
+```
+
