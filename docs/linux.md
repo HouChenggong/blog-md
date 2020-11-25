@@ -62,14 +62,46 @@ du -h --max-depth=1
     tail -f xxx.txt自动显示新增内容，默认10行，但是可以设置
   ```
 
-- ```
-  // 查询日志中带有xxxText的
-  tail -f xxx.log | grep xxxText
+- ```java
+  // 查询日志中带有xxxText的,注意两个''
+  tail -f xxx.log | grep 'xxxTex'
   // 一样查询
-  cat xxx.log | grep xxxText
-  ```
-
+  cat xxx.log | grep 'xxxText'
   
+```
+  
+
+#### 日志切分
+
+- head 命令是用来获取文本文件的开始n行。
+
+```java
+head -10000 java.log > javaHead.log
+```
+
+- tail 命令是用来获取文本最后行。
+
+```java
+tail -10000 java.log > javaTail.log
+```
+
+- sed 命令可以从第N行截取到第M行。（ N > 0 , M < FileLineNumber ）
+
+```java
+sed -n '1,50000p' java.log > javaRange.log
+```
+
+- Split 按照行切分–verbose 显示切分进度
+
+```java
+split -l 300 java.txt javaLog --verbose
+```
+
+- 按照文件大小切分，10M
+
+```java
+split -d 10m java.txt javaLog --verbose
+```
 
 
 
