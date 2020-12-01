@@ -11,6 +11,7 @@
 - [NLP parser官网](https://nlp.stanford.edu/software/lex-parser.shtml#Sample)
 - [美团NLP相关技术](https://tech.meituan.com/tags/nlp.html)
 - [读何晗的自然语言处理——笔记](https://github.com/NLP-LOVE/Introduction-NLP)——**推荐阅读**
+- [win-依存语法树可视化工具](http://nlp.nju.edu.cn/tanggc/tools/DependencyViewer.html)
 
 ### stanfordnlp
 
@@ -180,6 +181,8 @@ lemma对应MorphaAnnotator，它的作用是进行词的主干分析，比如把
 
 ner对应NERClassifierCombiner，用于实现命名实体识别。默认会使用CRF模型，也可以使用基于规则的算法。如果读者像训练自己的模型，可以参考[这里](https://nlp.stanford.edu/software/crf-faq.html#a)。详细的介绍请参考[这里](https://stanfordnlp.github.io/CoreNLP/ner.html)。
 
+- 主要用于搜索系统的判断，比如美团搜索酒店、地名等
+
 ##### 5.1 RegexNER正则命名体识别
 
 除此之外，我们还可以使用[RegexNER](https://nlp.stanford.edu/software/regexner.html)来自己定义识别实体的规则。RegexNer类似与正则表达式，但是它是基于Token(词)而不是字符串的(因此不太适合中文)。
@@ -223,11 +226,11 @@ parse对应的是ParserAnnotator，实现成分句法分析(Constituency Parsing
 
   - 目的是：分析一个词在一段话中的依赖关系，比如：《公积金》依赖的是《申请》
 
- #### 7、Dcoref
+ 
 
 - Coreference Resolution
 
-##### 7.1 depparse依存语法分析
+#### 7 depparse依存语法分析
 
 它对应的是DependencyParseAnnotator，用于实现依存句法分析(Dependency Parsing)。目前默认使用神经网络的模型，基于Shift-Reduce(SR-Parsing)
 
@@ -241,7 +244,7 @@ nsubj(申请-3, 公积金-1)
 advmod(申请-3, 如何-2)
 ```
 
-##### 7.2依存关系名称说明
+##### 7.1依存关系名称说明
 
 ```sql
 abbrev    :	 abbreviation modifier，缩写
@@ -298,9 +301,11 @@ xcomp     :	 open clausal complement
 xsubj     :	 controlling subject 掌控者
 ```
 
+##### 8.2 中文依存语法关系
+[中文依存语法关系介绍地址](http://www.ltp-cloud.com/intro#dp_how)
 
 
-##### 7.2 coref指代消除
+#### 8 coref指代消除
 
 coref用于实现指代消解。在一个文本中的可能有多个实体表示的是物理实际中的相同实体，我们需要找出这种关系来。
 
@@ -312,7 +317,7 @@ CoreNLP包含3种算法：
 - Statistical 基于统计的方法，只支持英文，而且依赖依存句法分析(depparse)。
 - Neural 基于深度学习的算法，支持英文和中文。
 
-##### 7.3 指代消除demo
+##### 8.1 指代消除demo
 
 ```java
 package com.fancyerii.blog.stanfordnlp;
@@ -372,7 +377,7 @@ public class CorefExample {
 
 
 
-#### 8、sentiment 情感分析
+#### 9、sentiment 情感分析
 
 对应SentimentAnnotator，用于情感分类，目前只支持英文。详细算法请参考[这里](https://nlp.stanford.edu/sentiment/),具体情感分为下面5类
 
@@ -388,7 +393,7 @@ public class CorefExample {
 
  
 
-#### 一个中文完整的例子
+#### 10、一个中文完整的例子
 
 ##### java pom
 
@@ -1031,5 +1036,53 @@ advmod(申请-3, 如何-2)
 
 
 
-## 如何落地
+## NLP应用的领域
+
+[第四范式机器人——参考](https://bot.4paradigm.com/admin/home/guide/kefu)
+
+### 依存语法的主要领域
+
+#### 1、 评论、意见、舆论抽取
+
+比如用户的评论是：《电池非常棒，机身不长，长的是待机，但是屏幕分辨率不高》
+
+我们根据依存语法分析之后可以得到：
+
+```java
+电池 = 棒
+机身 = 不长
+待机 = 长
+分辨率 = 不高
+```
+
+### 2、意图识别
+
+#### 2.1 基于模版的意图识别
+
+比如说：“北京今天天气怎么样？”我们会建一个叫“city”的词典，这里面会有北京、上海、天津等城市；我们会把今天、明天、后天等等也做一个词典，词典名字叫做“date”。这样如果满足刚开始有一个“city”，中间有任意字符串，然后再有一个“date”，然后再有“天气”这个词，就满足了一个模板，那么我们基本上可以认为它是一个询问天气怎么样的意图，这是模板的方法
+
+#### 2.2 基于分类的意图识别
+
+人工去标注这些语料是属于哪种意图的，用分类器模型来做一些二分类或者多分类的分类器，用来判断意图
+
+#### 2.3 基于知识库的意图识别落地
+
+基于知识库的问答可以使用检索或者分类模型来实现。检索式回答的流程是：首先对用户的输入问题做处理，如分词、抽取关键词、同义词扩展、计算句子向量等；然后基于处理结果在知识库中做检索匹配，例如利用BM25、TF-IDF或者向量相似度等匹配出一个问题集合，这类似推荐系统中的召回过程
+
+由于我们是一个问答系统，最终是直接返回给用户一个答案，因此需要从问题集合中挑出最相似的那个问题，这里会对问题集合做重排序，例如利用规则、机器学习或者深度学习模型做排序，每个问题会被打上一个分值，最终挑选出top1，将这个问题对应的答案返回给用户，这就完成了一次对话流程。在实际应用中，我们还会设置阈值来保证回答的准确性，若最终每个问题的得分低于阈值，会将头部的几个问题以列表的形式返回给用户，最终用户可以选择他想问的问题，进而得到具体的答案。
+
+- 重排序
+  - 文本相似度
+  - 检索相关度评分
+  - 语义相似度
+
+### 其它应用
+
+#### Q.1 基于词向量进行**单词语义相似度**判断
+
+最基本的应用就是查找与给定单词意义最相近的前 N 个单词。
+
+#### Q.2 基于文本所有词的向量平均值进行短文本相似度判断
+
+应用就是给一个文本，去查询列表中哪些文本和它相近
 

@@ -172,3 +172,10 @@ collection.aggregate([
 ])
 ```
 
+```java
+db.getCollection("xxxx").aggregate({"$group":{"_id":
+        {"user_name": "$user_name"}}
+})
+   
+```
+
