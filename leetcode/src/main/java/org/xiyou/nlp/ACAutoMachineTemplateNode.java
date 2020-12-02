@@ -13,17 +13,17 @@ import java.util.*;
  * @author zhangjunbo.
  */
 @Data
-public class ACAutoMachineNode {
+public class ACAutoMachineTemplateNode {
     private String word;
     private Boolean end;
-    private ACAutoMachineNode fail;
-    private Map<String, ACAutoMachineNode> next;
+    private ACAutoMachineTemplateNode fail;
+    private Map<String, ACAutoMachineTemplateNode> next;
 
     private HashSet<String> type;
 
     private HashSet<String> nextType;
 
-    public ACAutoMachineNode() {
+    public ACAutoMachineTemplateNode() {
         next = new HashMap<>();
         end = false;
         word = "";

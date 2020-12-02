@@ -109,13 +109,6 @@ public class PreTreeNode {
         System.out.println(result);
 
 
-        HashSet<String> a=new HashSet<>();
-        a.add("1");
-        a.add("");
-        HashSet<String> b=new HashSet<>();
-        b.add("1");
-        System.out.println(ACAutoMachineAnalyzer.typeExist(a,b));
-        System.out.println(ACAutoMachineAnalyzer.typeExist(b,a));
     }
 }
  
