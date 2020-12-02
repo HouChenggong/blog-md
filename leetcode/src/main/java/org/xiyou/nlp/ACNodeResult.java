@@ -17,7 +17,6 @@ import java.util.Set;
  * 在AC自动机中找到的节点数据
  */
 @Data
-@AllArgsConstructor
 public class ACNodeResult {
 
     /**
@@ -61,5 +60,13 @@ public class ACNodeResult {
         this.nextType = nextType;
         this.start = start;
         this.end = end;
+    }
+    public ACNodeResult(String word, HashSet<String> type, HashSet<String> nextType,HashSet<String> matchType, Integer start, Integer end) {
+        this.word = word;
+        this.type = type;
+        this.nextType = nextType;
+        this.start = start;
+        this.end = end;
+        this.matchType=matchType;
     }
 }

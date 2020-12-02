@@ -159,11 +159,11 @@ public class ACAutoMachineTemplateAnalyzer {
             if (tmpNode != null && tmpNode.getEnd()) {
                 if (existCommoneType(type, tmpNode.getType())) {
                     end = i;
-                    result = (new ACNodeResult(tmpNode.getWord(), tmpNode.getType(), tmpNode.getNextType(), 0, end));
+                    result = (new ACNodeResult(tmpNode.getWord(), tmpNode.getType(), tmpNode.getNextType(), getCommoneType(tmpNode.getType(), type), 0, end));
                 }
                 if (tmpNode.getFail() != null && tmpNode.getFail().getEnd()) {
                     if (tmpNode.getType().retainAll(type)) {
-                        result = (new ACNodeResult(tmpNode.getFail().getWord(), tmpNode.getFail().getType(), tmpNode.getFail().getNextType()));
+                        result = (new ACNodeResult(tmpNode.getFail().getWord(), tmpNode.getFail().getType(), tmpNode.getFail().getNextType(), getCommoneType(tmpNode.getType(), type), 0, end));
                     }
                 }
             }
@@ -191,6 +191,19 @@ public class ACAutoMachineTemplateAnalyzer {
         return false;
     }
 
+    public static HashSet<String> getCommoneType(HashSet<String> one, HashSet<String> two) {
+        if (CollectionUtils.isEmpty(one) || CollectionUtils.isEmpty(two)) {
+            return new HashSet<>();
+        }
+        HashSet<String> result = new HashSet<>();
+        result.addAll(one);
+        result.retainAll(two);
+        if (result.size() > 0) {
+            return result;
+        }
+        return new HashSet<>();
+    }
+
     public static List<ACTemplateChild> init() {
         List<String> dateList = Arrays.asList("今天", "昨天", "明天", "后天", "这周", "这个月", "这月", "温度计", "北京", "北京东站");
         List<String> weatherType = Arrays.asList("天气", "气温", "温度", "温度");
@@ -199,7 +212,7 @@ public class ACAutoMachineTemplateAnalyzer {
 
         List<String> city1List = Arrays.asList("北京", "河北", "河北秦皇岛", "秦皇岛", "山东", "北平", "北京车站", "北京东站", "温州");
         List<String> cityToList = Arrays.asList("到", "飞到", "至", "达到");
-        List<String> trafficList = Arrays.asList("飞机", "火车", "轮船", "汽车", "温度计");
+        List<String> trafficList = Arrays.asList("飞机", "火车", "轮船", "汽车", "温度计","秦皇岛");
         List<String> ignoreList = Arrays.asList("的", "地", "de", "di");
         ACTemplateChild child1 = new ACTemplateChild("city", Arrays.asList("cityTo", "cityIgnore", "traffic"), city1List);
         ACTemplateChild child2 = new ACTemplateChild("cityTo", Arrays.asList("city"), cityToList);
