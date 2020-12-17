@@ -73,15 +73,18 @@ public class ACAutoMachineTemplateAnalyzer {
         Queue<ACAutoMachineTemplateNode> queue = new LinkedBlockingDeque<>();
         queue.add(root);
         while (queue.size() > 0) {
+            // 广度优先遍历
             ACAutoMachineTemplateNode tmp = queue.remove();
             for (Map.Entry<String, ACAutoMachineTemplateNode> entry : tmp.getNext().entrySet()) {
                 String k = entry.getKey();
                 ACAutoMachineTemplateNode v = entry.getValue();
                 if (tmp.equals(root)) {
+                    // 第一层的fail总是指向root
                     v.setFail(root);
                 } else {
                     ACAutoMachineTemplateNode f = tmp.getFail();
                     while (f != null) {
+                        // 遍历它的孩子，看它们有没与当前孩子相同字符的节点
                         if (f.getNext().containsKey(k)) {
                             ACAutoMachineTemplateNode tmpFail = tmp.getNext().get(k);
                             tmpFail.setFail(f.getNext().get(k));
