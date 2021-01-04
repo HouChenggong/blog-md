@@ -1948,6 +1948,8 @@ protected synchronized Class<?> loadClass(String name,boolean resolve)throws Cla
 
   双亲委派模型有一系列的优势，还是需要去破坏双亲委派模型。比如 ：基础类去调用回用户的代码。
 
+[破坏双亲委派模型实现类隔离](https://mp.weixin.qq.com/s/oK6A3viNP3XafEvl7rzjKA)
+
 #### SPI里面的JDBC
 
 为什么必须要破坏?

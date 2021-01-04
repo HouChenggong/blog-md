@@ -124,3 +124,73 @@ public void givenPresentValue_whenCompare_thenOk() {
 
 String  str=String.join(";",listOrSet);
 
+### 并行流
+
+[Java8并行流](https://mp.weixin.qq.com/s/Jm1OQauP1wedc8Vx_nEpnw)
+
+```java
+List<Apple> appleList = new ArrayList<>(); // 假装数据是从库里查出来的
+
+for (Apple apple : appleList) {
+    apple.setPrice(5.0 * apple.getWeight() / 1000);
+}
+```
+
+修改为并行流的格式：
+
+```java
+appleList.parallelStream().forEach(apple -> apple.setPrice(5.0 * apple.getWeight() / 1000))
+```
+
+#### 并行流真的快吗？
+
+**什么是并行流：** 并行流就是将一个流的内容分成多个数据块，并用不同的线程分别处理每个不同数据块的流。并行流内部使用了默认的 ForkJoinPool 线程池。**默认的线程数量就是处理器的核心数**
+
+- 并行流使用的时候如果涉及拆箱和装箱问题，不一定快，尽量使用
+- 尽量使用 LongStream / IntStream / DoubleStream 等原始数据流代替 Stream 来处理数字，以避免频繁拆装箱带来的额外开销
+
+- 对于较少的数据量，不建议使用并行流
+
+
+
+以下是一些常见的集合框架对应流的可拆分性能表
+
+| 源              | 可拆分性 |
+| :-------------- | :------- |
+| ArrayList       | 极佳     |
+| LinkedList      | 差       |
+| IntStream.range | 极佳     |
+| Stream.iterate  | 差       |
+| HashSet         | 好       |
+| TreeSet         | 好       |
+
+#### 并行流线程安全吗？
+
+运行下面的代码，发现并不安全
+
+```java
+public static void main(String[] args) {
+//        System.out.println(sideEffectParallelSum(100));
+        System.out.println(sideEffectSum(100));
+    }
+    public static long sideEffectSum(long n) {
+        Accumulator accumulator = new Accumulator();
+        LongStream.rangeClosed(1, n).forEach(accumulator::add);
+        return accumulator.total;
+    }
+
+    public static long sideEffectParallelSum(long n) {
+        Accumulator accumulator = new Accumulator();
+        LongStream.rangeClosed(1, n).parallel().forEach(accumulator::add);
+        return accumulator.total;
+    }
+
+    public static class Accumulator {
+        private long total = 0;
+
+        public void add(long value) {
+            total += value;
+        }
+    }
+```
+

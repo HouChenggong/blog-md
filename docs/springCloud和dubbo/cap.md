@@ -32,7 +32,9 @@
 
 
 
-## zookeper
+## [zookeper](https://mp.weixin.qq.com/s/EN-K05J8R5SYbeG9OCCqVg)
+
+
 
 Zookeeper 的数据模型是什么样子呢？它很像数据结构当中的树，也很像文件系统的目录
 
@@ -148,6 +150,8 @@ B向D寻找，B<D,D有两票，超过半数，D当选
 自此，故障恢复正式完成。
 
 ### ZAB消息广播
+
+类似一个二段式提交，但又不同，二段式提交要求所有参与者要么成功、失败，但是ZAB广播只需要半数以上节点成功即可。
 
 **Broadcast**
 
