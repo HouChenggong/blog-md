@@ -152,6 +152,21 @@ List<CodeRulePackage> getAllByConfigFatherIdAndShow
 
 3. 用map、List查询都不可以，因为查询的结果是JSON
 
+- 如下只查询id,app_id,timestamp三个字段，其中ID默认查询
+
+```java
+db.xxxx.find(
+    {"app_id":96,"knowledge_ori_id": {"$exists": true},
+     "timestamp": { "$gte": 1610035200000,"$lte" :1610121600000}
+    },
+    { "app_id" : 1,
+     "timestamp" : 1
+    }
+  )
+```
+
+
+
  ### 3. 多表联查
 
 问题1：objectId不能和string联查，解决方案是：
@@ -178,4 +193,361 @@ db.getCollection("xxxx").aggregate({"$group":{"_id":
 })
    
 ```
+
+### 时间戳聚合查询某一天的数据
+
+```java
+ {
+    "_id": {"$oid": "5ff83089c3db080017fdc968"},
+    "app_id": 96,
+    "timestamp": 1610100873416
+  },
+  {
+    "_id": {"$oid": "5ff8303ac3db080017fdc966"}, 
+    "app_id": 96,
+    "timestamp": 1610100794510
+  }
+```
+
+
+
+#### 聚合查询SQL：
+
+比如我想查询的SQL是：
+
+```sql
+select  day ,count(*) from xxx where app_id =xxx group by app_id , day
+```
+
+在mongo中将时间戳转化为时间的SQL如下：
+
+#### mongo将时间戳转为日期格式
+
+```java
+db.xxx.aggregate(
+   [
+     {
+       $project: {
+          timestamp: 1,
+          app_id: 1,
+          day: {$dateToString: {format: "%Y-%m-%d %H:%M:%S:%L", date:{"$add":[new Date(0),"$timestamp"]}}},
+          day8: {$dateToString: {format: "%Y-%m-%d %H:%M:%S:%L", date:{"$add":[new Date(0),"$timestamp",28800000]}}}
+       }
+     }
+   ]
+)
+```
+
+转换的结果如下：day8是多个8个小时的结果
+
+```java
+  {
+    "_id": {"$oid": "5fb12ea4c33c7400175b9cb5"},
+    "app_id": 45,
+    "day": "2020-10-23 10:02:12:461",
+    "day8": "2020-10-23 18:02:12:461",
+    "timestamp": 1603447332461
+  },
+  {
+    "_id": {"$oid": "5fb12ea4c33c7400175b9cb6"},
+    "app_id": 45,
+    "day": "2020-10-23 10:02:12:503",
+    "day8": "2020-10-23 18:02:12:503",
+    "timestamp": 1603447332503
+  }
+```
+
+#### match和project组合查询
+
+```json
+db.xxxx.aggregate(
+    {$match:
+         {  "app_id":96,
+            "timestamp": {"$exists": true},
+            "timestamp": { "$gte": 1610035200000,"$lte" :1610121600000}
+         }
+     },
+     {
+       $project: {
+          timestamp: 1,
+         	app_id: 1,
+          day: {$dateToString: {format: "%Y-%m-%d %H:%M:%S:%L", date:{"$add":[new Date(0),"$timestamp"]}}},
+          day8: {$dateToString: {format: "%Y-%m-%d %H:%M:%S:%L", date:{"$add":[new Date(0),"$timestamp",28800000]}}}
+       }
+    }
+)
+```
+
+- 查询的结果如下：
+
+```json
+{
+    "_id": {"$oid": "5ff83089c3db080017fdc968"},
+    "app_id": 96,
+    "day": "2021-01-08 10:14:33:416",
+    "day8": "2021-01-08 18:14:33:416",
+    "timestamp": 1610100873416
+  },
+  {
+    "_id": {"$oid": "5ff83089c3db080017fdc967"},
+    "app_id": 96,
+    "day": "2021-01-08 10:14:33:393",
+    "day8": "2021-01-08 18:14:33:393",
+    "timestamp": 1610100873393
+  }
+```
+
+#### match、project、group 组合查询
+
+```java
+db.scsa_chat_content.aggregate(
+    {$match:
+         {  "app_id":96,
+            "timestamp": {"$exists": true},
+            "timestamp": { "$gte": 0,"$lte" :1610121600000}
+         }
+     },
+     {
+       $project: {
+          app_id: 1,
+          day: {$dateToString: {format: "%Y-%m-%d", date:{"$add":[new Date(0),"$timestamp"]}}},
+          day8: {$dateToString: {format: "%Y-%m-%d", date:{"$add":[new Date(0),"$timestamp",28800000]}}}
+       }
+    },
+    { $group :
+         { "_id" : { "app_id" : "$app_id", "day" : "$day" }}
+     }
+)
+```
+
+结果如下：发现不是列表结构
+
+```java
+ {
+    "_id": {
+      "app_id": 96,
+      "day": "2020-12-18"
+    }
+  },
+  {
+    "_id": {
+      "app_id": 96,
+      "day": "2021-01-08"
+    }
+  }
+```
+
+
+
+#### 对match project group结果再次用project封装
+
+```json
+db.scsa_chat_content.aggregate(
+    {$match:
+         {  "app_id":96,
+            "timestamp": {"$exists": true},
+            "timestamp": { "$gte": 0,"$lte" :1610121600000}
+         }
+     },
+     {
+       $project: {
+          app_id: 1,
+          day: {$dateToString: {format: "%Y-%m-%d", date:{"$add":[new Date(0),"$timestamp"]}}},
+          day8: {$dateToString: {format: "%Y-%m-%d", date:{"$add":[new Date(0),"$timestamp",28800000]}}}
+       }
+    },
+    { $group :
+         { "_id" : { "app_id" : "$app_id", "day" : "$day" }}
+     },
+     { "$project" : { "app_id" : "$_id.app_id", "day" : "$_id.day"} }
+)
+```
+
+现在才有列表结构，结果如下：
+
+```json
+  {
+    "_id": {
+      "app_id": 96,
+      "day": "2020-12-18"
+    },
+    "app_id": 96,
+    "day": "2020-12-18"
+  },
+  {
+    "_id": {
+      "app_id": 96,
+      "day": "2021-01-08"
+    },
+    "app_id": 96,
+    "day": "2021-01-08"
+  }
+```
+
+#### mongo count limit skip
+
+```java
+db.xxx.aggregate(
+    {$match:
+         {  "app_id":96,
+            "timestamp": {"$exists": true},
+            "timestamp": { "$gte": 0,"$lte" :1610121600000}
+         }
+     },
+     {
+       $project: {
+          app_id: 1,
+          day: {$dateToString: {format: "%Y-%m-%d", date:{"$add":[new Date(0),"$timestamp"]}}},
+          day8: {$dateToString: {format: "%Y-%m-%d", date:{"$add":[new Date(0),"$timestamp",28800000]}}}
+       }
+    },
+    { $group :
+         { "_id" : { "app_id" : "$app_id", "day" : "$day" }, oneDayCount :{"$sum":1}}
+     },
+     { "$project" : { "app_id" : "$_id.app_id", "day" : "$_id.day", "acount":"$oneDayCount"} }
+)
+```
+
+查询的结果如下：发现有了oneDayCount
+
+```json
+  {
+    "_id": {
+      "app_id": 96,
+      "day": "2020-12-18"
+    },
+    "acount": 30,
+    "app_id": 96,
+    "day": "2020-12-18"
+  },
+  {
+    "_id": {
+      "app_id": 96,
+      "day": "2021-01-08"
+    },
+    "acount": 55,
+    "app_id": 96,
+    "day": "2021-01-08"
+  }
+```
+
+
+
+#### Java mongo聚合API
+
+- 聚合查询如下：
+
+```java
+private AggregationResults<XXXDTO> getDayAggregation() {
+        // 现在之前的数据，可以根据场景自由限定
+        Criteria query = Criteria.where("timestamp").gte(0L).lte(System.currentTimeMillis());
+        query.and("app_id").is(96);
+   			query.and("timestamp").exists(true);
+        Aggregation agg = Aggregation.newAggregation(
+                // 第二步：sql where 语句筛选符合条件的记录
+                Aggregation.match(query),
+                Aggregation.project("app_id", "timestamp")
+                        .andExpression("{$dateToString: {date: { $add: {'$timestamp', [0]} }, format: '%Y%m%d'}}", new Date(28800000)).as("oneDay"),
+                // 第三步：分组条件，设置分组字段
+                Aggregation.group("app_id", "day").count().as("oneDayCount"),
+                // 第四部：排序（根据某字段排序 倒序）
+                Aggregation.skip(0),
+                // 第五步：数量(分页)
+                Aggregation.limit(100),
+                Aggregation.project("app_id", "oneDay", "oneDayCount")
+        );
+        AggregationResults<XXXDTO> results = mongoTemplate.aggregate(agg, XXX.class, DayChatContentCountDTO.class);
+        log.info("query   sql is : [{}],", agg.toString());
+        return results;
+    }
+```
+
+查询日志如下：
+
+```json
+[
+    {
+        "aggregate":"__collection__",
+        "pipeline":[
+            {
+                "$match":{
+                    "timestamp":{
+                        "$gte":{
+                            "$numberLong":"0"
+                        },
+                        "$lte":{
+                            "$numberLong":"1610104027084"
+                        }
+                    },
+                    "appId":96,
+                    "timestamp":{
+                        "$exists":true
+                    }
+                }
+            },
+            {
+                "$project":{
+                    "appId":1,
+                    "timestamp":1,
+                    "oneDay":{
+                        "$dateToString":{
+                            "date":{
+                                "$add":[
+                                    "$timestamp",
+                                    {
+                                        "$date":28800000
+                                    }
+                                ]
+                            },
+                            "format":"%Y%m%d"
+                        }
+                    }
+                }
+            },
+            {
+                "$group":{
+                    "_id":{
+                        "appId":"$appId",
+                        "oneDay":"$oneDay"
+                    },
+                    "oneDayCount":{
+                        "$sum":1
+                    }
+                }
+            },
+            {
+                "$skip":{
+                    "$numberLong":"0"
+                }
+            },
+            {
+                "$limit":{
+                    "$numberLong":"100"
+                }
+            },
+            {
+                "$project":{
+                    "appId":"$_id.appId",
+                    "oneDay":"$_id.oneDay",
+                    "oneDayCount":1
+                }
+            }
+        ]
+    }
+]
+```
+
+查询结果如下：发现符合结果
+
+```java
+
+结果如下：将时间戳改为了日期
+XXXDTO(appId=96, day=20201125, oneDayCount=14)
+XXXDTO(appId=96, day=20201218, oneDayCount=15)
+XXXDTO(appId=96, day=20210108, oneDayCount=27)
+```
+
+
+
+
 

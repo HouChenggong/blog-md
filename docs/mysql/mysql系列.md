@@ -325,7 +325,11 @@ MySQL 索引，不管是在磁盘里，还是被 load 到内存后，都是 B+ �
 
 count（**）和count（1）的区别是count（*）通过最小索引树遍历后不需要返回行数据直接+1，count（1）是需要返回数据的但是不做为空判断+1
 
-
+- 在有null的列使用count(*)进行查询数据，count(列名)不会查询为空的列
+- 在使用count(distinct name ,mobile) 查询的时候如果其中有一列数据为空，那么即使另一列不为空，count数据也会丢失
+- 当某列为空的时候，如果用!=或者<>查询，会丢失为空的列
+- 当某列为空，可能会导致sum(column)返回结果为空，而非0，解决方案：select ifnull(sum(num),0)
+- 如何正确查询非空数据：select * from where name is not null
 
 
 
