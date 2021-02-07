@@ -2,6 +2,36 @@
 
 ## RocketMQ
 
+### 导读
+
+这个是介绍RocketMQ基础、高可用、还有相关原理的整合文章，同时希望读的时候带着下面的问题
+
+| QA                                     | 关联QA                                                | 说明 | 其它 |
+| -------------------------------------- | ----------------------------------------------------- | ---- | ---- |
+| 为啥RocketMQ要单独写一个NameServer？   |                                                       |      |      |
+|                                        | NameServer遵循的是CAP中的哪个？                       |      |      |
+|                                        | NameServer如何保证最终一致性？                        |      |      |
+|                                        | 客户端为啥只需要和一个NameServer建立连接？            |      |      |
+| 为啥RocketMQ的重试机制只针对普通消息？ |                                                       |      |      |
+|                                        | 为啥重试的时候会优先选择其它Broker?                   |      |      |
+|                                        |                                                       |      |      |
+| 如何保证RocketMQ高可用？               |                                                       |      |      |
+|                                        | 生产者、消费者、Broker、NameServer如何做到高可用？    |      |      |
+| 如何保证消息不丢失？                   |                                                       |      |      |
+|                                        | 生产者、消费者、Broker、OS cache如何保证不丢失？      |      |      |
+| 如何保证消息不乱序？                   |                                                       |      |      |
+|                                        | 发送时、存储时、消费时如何保证不乱序？                |      |      |
+|                                        | 什么是瞬时乱序行为？                                  |      |      |
+| 如何保证消息幂等性？                   |                                                       |      |      |
+| 消费者Rebalance原理是什么？            |                                                       |      |      |
+|                                        | Rebalance会带来什么问题？                             |      |      |
+|                                        | Rebalance过程中消费者自己分配队列，如何保证脑裂问题？ |      |      |
+|                                        | 如果某个消费者没有收到Rebalance通知怎么办？           |      |      |
+| 分区有序消息是如何选择的？             |                                                       |      |      |
+| 定时、延时消息原理是什么？             |                                                       |      |      |
+
+
+
 ### 集群架构
 
 ![](https://s4.51cto.com/images/blog/202010/28/4ad02c1b9946aa548684f1e1af83a357.png)
@@ -21,7 +51,7 @@
 - Consumer集群
   - 消费消息的集群
 
-### 主要功能
+#### 主要功能
 
 - 高可用——不丢消息
 
@@ -38,75 +68,75 @@
 - 回溯消费——多次消费
 
 
-### 消费模式
+#### 消费模式
 
-#### 集群消费
+##### 集群消费
 
 - 平分消息
 
 
   - 消息消费失败进行重复投递，大于15次，进入死信队列并报警
 
-#### 广播消费
+##### 广播消费
 
   - 无失败处理，需要业务方自行处理
   - 无法处理顺序消息 
 
-### 名词解释
+#### 名词解释
 
-#### 死信消息
+##### 死信消息
 
 -  消息消费重试发送16次失败、消息被拒绝并且不再重新投递，会产生一个名为%DLQ%+consumergroup的队列，这个队列为死信队列
 
-#### 消息堆积
+##### 消息堆积
 
 -  消息发送的速率远远大于消息消费的速率导致消息堆积
 
-#### 同步、异步复制
+##### 同步、异步复制
 
 复制指的是Broker之间的数据同步模式，分为同步和异步两种。
 
 - 同步复制：生产者会等待同步复制成功后才返回消息发送成功
 - 异步复制：消息写入到MasterBroker后即认为写入成功，此时有较低的写入延迟和较大的吞吐量
 
-#### 同步、异步刷盘
+##### 同步、异步刷盘
 
 刷盘指的是数据发送到Broker的内存，通常指的是PageCache后，以何种方式持久化到磁盘。
 
 - 同步刷盘：生产者会等待数据持久化到磁盘后才返回消息发送成功，可靠性极强
 - 异步刷盘：消息写入PageCache后即认为写入成功，到达一定量时自动触发刷盘，此时有较低的延迟和吞吐量
 
-### 功能介绍
+#### 功能介绍
 
-#### 并发消费
+##### 并发消费
 - 消息并发消费，异常消费不会阻塞消费
 - 消息消费异常，异常的消息会发回重试队列
 -  默认重试16次
 
-#### 顺序消费
+##### 顺序消费
   - 消息顺序消费，队列会被lock，异常消息不能跳过
   - 异常消息不能跳过，会不断重试，消息顺序性可能得到保证
-#### 超时消费
+##### 超时消费
   - 单个消息阻塞时间默认15分钟
   - 超时后会进入重试队列
-### 消息分类
+#### 消息分类
 
-#### 单项消息OneWay
+##### 单项消息OneWay
 
 - 不保证消息发送成功，多用于日志类型的消息，对业务无影响
 - 此方式发送消息的过程耗时非常短，一般在微秒级别。
 
-#### 同步普通消息
+##### 同步普通消息
 
 - 同步发送：是指消息发送方发出一条消息后，会在收到服务端返回响应之后才发下一条消息的通讯方式。
 
 - 适用场景：重要通知邮件、报名短信通知、营销短信系统等。
 
-#### 异步普通消息
+##### 异步普通消息
 
 - 异步发送：是指发送方发出一条消息后，不等服务端返回响应，接着发送下一条消息的通讯方式，但是我们要做的事，需要自己实现异步发送回调接口（SendCallback），处理响应结果
 
-#### 全局有序消息
+##### 全局有序消息
   - 保证顺序发送、顺序存储、顺序消费
   - 1.1）单线程发送、上一个成功才能发送下一个
   - 1.2）只能同步发送
@@ -114,31 +144,31 @@
   - 2.1）由于一个消息Topic会有多个Queue，要保证顺序存储，需要将同一个业务的消息发送到同一个Queue。即对业务编号进行hash，将消息发送到同一个队列中
   - 消息顺序消费：同一时刻一个消费队列queue只能被一个线程消费
 
-#### 分区有序消息
+##### 分区有序消息
 
   - 对于一个topic所有消息会根据sharding key进行区块分区，同一个分区内的消息会严格按照FIFO顺序发布和消费
 
     sharding key 是顺序消息中用来区分不同分区的字段，和普通消息的key不是一个概念
 
-#### 定时、延时消息
+##### 定时、延时消息
 
   - 并非精确到时分秒，而是有一个颗粒度
   - 目前默认设置为：1s 5s 10s 30s 1m 2m 3m 4m 5m 6m 7m 8m 9m 10m 20m 30m 1h 2h，从1s到2h分别对应着等级1到18，而阿里云中的版本(要付钱)是可以支持40天内的任何时刻（毫秒级别）
   - 需要延时、定时的场景一定要有补偿机制，做一些兜底的逻辑
 
-#### 广播消息
+##### 广播消息
 
   - 每一个消费者组都会收到消息
 
-#### 事物消息
+##### 事物消息
 
   - VKMQ 提供类似 X/Open XA 的分布事务功能，通过 VKMQ 事务消息能达到分布式事务的最终一致。
 
-#### 批量处理消息
+##### 批量处理消息
 
   - 一批消息只会被一个队列消费，另一个队列消费不到
 
-#### 条件筛选消息
+##### 条件筛选消息
 
   - 类似SQL过滤
 ### 可靠性测试
@@ -194,8 +224,6 @@
 再说消息丢失之前，我们先来看下一个正常消息的整个链路流程
 
 Producer——【Broker OS Cache ——磁盘】——Consumer
-
-[最佳实战](http://wiki.vipkid.com.cn/pages/viewpage.action?pageId=161856241)
 
 #### 1-producer——Broker发消息
 
@@ -493,7 +521,7 @@ Broker端主要负责Rebalance元数据维护，以及通知机制，在整个�
   - Kafka：会在消费者组的多个消费者实例中，选出一个作为Group Leader，由这个Group Leader来进行分区分配，分配结果通过Cordinator(特殊角色的broker)同步给其他消费者。相当于Kafka的分区分配只有一个大脑，就是Group Leader。
   - RocketMQ：每个消费者自己给自己分配队列，每个人都是一个大脑
 
-##### 每个消费者自己分配队列，如何避免脑裂问题
+##### 每个消费者自己分配队列，如何避免脑裂问题？
 
 - 因为每个消费者自己都不知道其它消费者分配的结果，会不会出现一个队列分配给了多个消费者，或者有的队列没有分配？
 
@@ -523,7 +551,7 @@ Broker端主要负责Rebalance元数据维护，以及通知机制，在整个�
 
 - 每个消费者都会定时去触发Rebalance，以避免Rebalance通知失效。也就是说假如某个消费者没有收到某次的Rebalance请求，但是它自己也会周期性的进行Rebalance,默认时间是20秒
 
-#### 
+
 
 
 
@@ -878,6 +906,10 @@ Producer将消息投递到Broker中，Broker在收到用户发送的消息后，
 
 延时逻辑见：ScheduleMessageService，即按照配置初始化多个任务，每秒执行一次，如果满足条件则将消息投递到原有的topic中。
 
+
+
+### QA
+
 #### RocketMQ分区是如何选择的？
 
 - 未指定分区的消息会轮询的方式选择分区，比如普通消息
@@ -889,3 +921,105 @@ Producer将消息投递到Broker中，Broker在收到用户发送的消息后，
 | 广播无法处理顺序消费                                        | 容易产生消息堆积                   |                                      |                                                             |
 | 客户端每次重启都会拉取最新消息,<br />而不是上次保存的offset | 消费失败无法跳过，当前队列需要暂停 |                                      |                                                             |
 
+#### [1、为啥RocketMQ 要单独设计一个NameServer?](https://blog.csdn.net/tianshouzhi/article/details/103607565)
+
+目前可以作为服务发现的组件有很多，比如Zookeper、consul等，那为啥RocketMQ要单独开发一个呢？
+
+- RocketMQ的架构设置决定了只需要一个轻量级的元数据服务器就足够了，只需要保证最终一致性，而不需要像Zookeeper这样的强一致性方案，因此不需要依赖另外一个中间价，降低了维护成本
+- 也就是说RocketMQ在CAP理论中，选择了AP而非CP（Consistency一致性，Availability可用性，Partition分区容错性）。即只要不是所有的nameserver都挂了，rocketMQ还能使用
+- 另外说下kafka目前也在做一个方案就是替换掉zookeeper
+
+#### 2、NameServer如何保证最终一致性？
+
+对于zookeeper这样强一致性的组件，只要数据写到了主节点，内部会将数据复制到其他节点，zookeeper使用的是Zab协议。但是NameServer集群之间是不互相通信的，无法进行数据的复制，所有某个时刻各个节点之间的数据可能不一致，那NameServer是如何保证客户端最终能拿到正确的数据呢？我们从服务注册、剔除、发现三个角度说明
+
+- 服务注册
+  - rocketMQ采用的策略是：在Broker启动的时候轮询NameServer列表，与每个NameServer服务器建立长链接，发起注册请求。NameServer内部会维护一个Broker表，用于动态存储Broker的信息
+  - 同时Broker为了证明自己是活着的，每隔一段时间会上报信息到NameServer,而NameServer接收到心跳包后会更新时间戳，记录这个Broker最新的存活时间
+  - 在记录Broker表的时候，可能有多个Broker同时操作，RocketMQ引入ReadWriteLock读写锁，保证同一时刻只有一个写操作。这也是ReadWriteLock读多写少的经典使用场景
+- 服务剔除
+  - 正常情况下：如果一个Broker关闭了，会断开与NameServer的长连接，然后会将这个Broker的信息剔除
+  - 异常情况下：NameServer有一个兜底机制，每隔10秒扫描下Broker表，如果发现某个Broker最新的时间戳距离现在已经超过120秒，则将其剔除
+
+- 服务发现，针对的是生产者和消费者
+
+  - 生产者：一般生产者可以发送一个消息到不同的topic，因此一般在发送第一条消息时才会根据Topic获取从NameServer的路由信息
+  - 消费者：订阅的topic一般是固定的，所以在启动时就会拉取
+
+  那么生产者/消费者在工作的过程中，如果路由信息发生了变化怎么处理呢？如：Broker集群新增了节点，节点宕机或者Queue的数量发生了变化。细心的读者注意到，前面讲解NameServer在路由注册或者路由剔除过程中，并不会主动推送会客户端的，这意味着，需要由客户端拉取主题的最新路由信息。
+
+  - 所以生产者和消费者都做了定时任务兜底机制，每隔30秒拉取最新数据，但是如果这30秒Broker挂了怎么办？这里RocketMQ引入了重试机制来解决
+  - 通过重试机制能保证生产者发送消息的高可用，而且由于不需要NameServer通知众多不固定的生产者，降低了NameServer实现的复杂性
+
+#### 3、为啥客户端不需要与所有的Name Server建立连接，而是选择其中一个？
+
+1、NamServer是满足最终一致性的，即使某个时刻NameServer集群中各个节点的数据不同，仍能保证消息的正常发送
+
+2、NameServer一般只有几台，但是生产者或者消费者客户端会有很多个，如果全连接，这个对于NameServer的压力也很大
+
+3、客户端每次选择NameServer的时候，也并不是一直都访问一个NameServer节点，而是动态的选择，刚开始的时候产生一个随机值，之后每次访问值+1
+
+```java
+private static int initValueIndex() {
+    Random r = new Random();
+    return Math.abs(r.nextInt() % 999) % 999;
+}
+private final AtomicInteger namesrvIndex = new AtomicInteger(initValueIndex());
+// 之后namesrvIndex+1
+```
+
+
+
+#### 4、为啥RocketMQ的重试机制只针对普通消息？
+
+首先我们知道RocketMQ引入重试机制是为了保证生产者的高可用，但是因为NameServer在某个时刻不同NameServer节点存储的数据可能不同，重试机制进而也保证了NameServer的最终一致性，这个上面有介绍
+
+那么为啥重试机制只针对普通消息呢？
+
+- 因为普通消息在重试的过程中会更换Broker进行重试。那又引入了一个问题
+
+- 为啥消息重试的时候要更换Broker，而非换当前Broker下面的不同队列呢？
+
+  - 这里主要是考虑既然发送到当前Broker的消息失败了，那么发送到这个Broker上其它Queue的可能性依然很大，所以选择了其它Broker,因为一般是Broker当机了，而非一个Broker上的queue坏了。
+
+    代码位置：[TopicPublishInfo](https://github.com/apache/rocketmq/blob/master/client/src/main/java/org/apache/rocketmq/client/impl/producer/TopicPublishInfo.java)
+
+```java
+public MessageQueue selectOneMessageQueue(final String lastBrokerName) {
+  				// 消息第一次发送，上一个失败的Broker名称为NULL，直接round选择
+            if (lastBrokerName == null) {
+                return selectOneMessageQueue();
+            } else {
+             // 消息发送失败重试（上一个失败的Broker不为空）优先选择其它的Broker
+                for (int i = 0; i < this.messageQueueList.size(); i++) {
+                    int index = this.sendWhichQueue.getAndIncrement();
+                    int pos = Math.abs(index) % this.messageQueueList.size();
+                    if (pos < 0)
+                        pos = 0;
+                    MessageQueue mq = this.messageQueueList.get(pos);
+                  // 直到找到一个Broker名称不相同的进行返回
+                    if (!mq.getBrokerName().equals(lastBrokerName)) {
+                        return mq;
+                    }
+                }
+              // 没有其它的Broker可选，依然round选择，可能会选择到之前失败的Broker上的队列
+                return selectOneMessageQueue();
+            }
+        }
+
+ public MessageQueue selectOneMessageQueue() {
+        int index = this.sendWhichQueue.getAndIncrement();
+        int pos = Math.abs(index) % this.messageQueueList.size();
+        if (pos < 0)
+            pos = 0;
+        return this.messageQueueList.get(pos);
+    }
+```
+
+我们上面说普通消息有重试机制，而重试机制是优先换Broker，那么对于普通消息来说，重试后的消息依旧是无序的，但是如果给有序消息引入重试机制，在Broker宕机的情况下，消息会选择到其它队列上造成短暂的无序，而后相关信息经过hash还能保持有序，这时Broker又恢复了，这个时候又会带来短暂的无序。
+
+而对于全局有序消息来说，如果当前消息所在队列的Broker宕机了，则会阻塞无限重试。
+
+故：有序消息如果进行重试会带来短暂的无序，这个是不进行重试的一个原因，另一个重要的原因是：对于这些有序消息由于发送的时候只会发送到某个特定的Queue中，如果发送失败，重试失败的可能性依然很大，所以默认不重试，如果需要重试，则可以代码中手动重试。 
+
+#### 5、为啥
