@@ -13,3 +13,11 @@
 
 - 词典和倒排表是分两部分存储的，词典存储在内存中，倒排表存储在磁盘上。
 
+### ES集群的形成
+
+#### [传输层用于集群间系统通信方式](https://www.elastic.co/guide/en/elasticsearch/reference/current/modules-transport.html)
+
+- Rest客户端通过HTTP将请求发送到您的ES集群，但是接收到客户端请求的节点肯定是要请求进一步传递给其它节点处理。传输层用于集群间的内部通信
+
+- 节点间通信的方式。两个节点由很多长期存在的TCP连接组成。而且，ES要求这些连接需要保持open的状态
+

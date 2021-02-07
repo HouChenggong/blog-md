@@ -462,6 +462,33 @@ private AggregationResults<XXXDTO> getDayAggregation() {
     }
 ```
 
+上诉给了时间戳添加了8个小时，但是因为我们存储的是时间戳所以不需要添加8个小时，如果是其它的时间格式可以添加8个小时
+
+```java
+private AggregationResults<XXXDTO> getDayAggregation() {
+        // 现在之前的数据，可以根据场景自由限定
+        Criteria query = Criteria.where("timestamp").gte(0L).lte(System.currentTimeMillis());
+        query.and("app_id").is(96);
+   			query.and("timestamp").exists(true);
+        Aggregation agg = Aggregation.newAggregation(
+                // 第二步：sql where 语句筛选符合条件的记录
+                Aggregation.match(query),
+                Aggregation.project("app_id", "timestamp")
+                        .andExpression("{$dateToString: {date: { $add: {'$timestamp', [0]} }, format: '%Y%m%d'}}", new Date(0)).as("oneDay"),
+                // 第三步：分组条件，设置分组字段
+                Aggregation.group("app_id", "day").count().as("oneDayCount"),
+                // 第四部：排序（根据某字段排序 倒序）
+                Aggregation.skip(0),
+                // 第五步：数量(分页)
+                Aggregation.limit(100),
+                Aggregation.project("app_id", "oneDay", "oneDayCount")
+        );
+        AggregationResults<XXXDTO> results = mongoTemplate.aggregate(agg, XXX.class, DayChatContentCountDTO.class);
+        log.info("query   sql is : [{}],", agg.toString());
+        return results;
+    }
+```
+
 查询日志如下：
 
 ```json

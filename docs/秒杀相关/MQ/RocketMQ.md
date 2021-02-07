@@ -15,6 +15,7 @@
   - Kafka使用的是Zookeper保存Broker的地址信息，以及Broker的Leader选举，在RocketMQ中没有采用Broker的选举机制，所以采用无状态的NameServer来存储，由于NameServer无状态，所以集群节点间不会通信，上传数据的时候需要向所有的节点发送
 - Broker
   - 消息中转器，用于消息保存和转发
+  - 每个消费者会向所有的Broker进行心跳，因此每个Broker维护了所有消费者的实例
 - Produce集群
   - 生产消息的集群
 - Consumer集群
@@ -464,14 +465,404 @@ final` `long` `offset = msgs.get(``0``).getQueueOffset();``final` `String maxOff
 
 ##### Rebalance会带来什么负面影响呢
 
-- 消费停滞
-- 重复消费：由于Rebalance并不会等待消息提交后再rebalance，所以会有少量重复消费的现象
+- 消费停滞：比如原本有一个消费者A负责消费5个队列，这个时候来了一个消费者B，那么消费者A肯定会暂停消费，直到rebalance完成
+- 重复消费：由于Rebalance并不会等待消息提交后再rebalance，所以会有少量重复消费的现象。
+  - 道理上消费者B在执行完Rebalance之后会接着从消费者A已经消费的offset继续开始消费，但是默认的情况下，offset是异步提交的。
+  - 比如消费者A消费到的offset是10，但是异步提交给broker的offset是8，那消费者B肯定是从8开始消费，导致了两条数据重复消费。
+  - 根源：消费者B不会等待消费者A提交完offset后再进行Rebalance，因此提交时间间隔越长，可能造成重复的数据越多
 
 
 
 ### MQ相关原理探究
 
-#### 消费者Rebalance机制
+#### [消费者Rebalance机制](https://blog.csdn.net/tianshouzhi/article/details/103607572)
+
+基于Rebalance可能会给业务造成的负面影响，我们有必要对其内部原理进行深入剖析，以便于问题排查。我们将从Broker端和Consumer端两个角度来进行说明：
+
+Broker端主要负责Rebalance元数据维护，以及通知机制，在整个消费者组Rebalance过程中扮演协调者的作用，而Consumer端分析，主要聚焦于单个Consumer的Rebalance流程。
+
+
+
+##### broker在Rebalance中的作用
+
+- 触发broker的Rebalance的原因
+  - 消费者实例发生变化：如消费者上线、下线、与broker意外断开连接、订阅的topic发生变化等
+  - 队列信息发生变化：如单个topic扩容、缩容，broker宕机等
+- 无论是哪种原因触发了broker的Rebalance，broker都会通知当前消费者组下面的所有实例进行Rebalance
+- broker会给每个消费者实例发送一个通知，每个消费者实例在接收到通知后自行触发Rebalance,也就是每个消费者实例各自Rebalance，即每个消费者实例自己给自己重新分配队列，而非Broker将分配好的结果告知Consumer，这点和Kafka类似，二者的Rebalance都是在客户端进行的，不同的是：
+  - Kafka：会在消费者组的多个消费者实例中，选出一个作为Group Leader，由这个Group Leader来进行分区分配，分配结果通过Cordinator(特殊角色的broker)同步给其他消费者。相当于Kafka的分区分配只有一个大脑，就是Group Leader。
+  - RocketMQ：每个消费者自己给自己分配队列，每个人都是一个大脑
+
+##### 每个消费者自己分配队列，如何避免脑裂问题
+
+- 因为每个消费者自己都不知道其它消费者分配的结果，会不会出现一个队列分配给了多个消费者，或者有的队列没有分配？
+
+- 这个rocketMQ也进行了2个维度的保证
+
+  - 对于topic队列和消费者各自进行排序
+  - 每个消费者使用相同的分配策略
+
+  尽管每个消费者是各自给自己分配，但是因为使用的相同的分配策略，定位从队列列表中哪个位置开始给自己分配，给自己分配多少个队列，从而保证最终分配结果的一致
+
+  ```java
+  // 查看当前实例ID的位置
+  int index = cidAll.indexOf(currentCID);
+  //mqAll是所有队列
+  for (int i = index; i < mqAll.size(); i++) {
+  	// 循环加入分配结果
+  	if (i % cidAll.size() == index) {
+  		result.add(mqAll.get(i));
+  		}
+  }
+  return result;
+  ```
+
+  
+
+##### 如果某个消费者没有收到Rebalance通知怎么办？
+
+- 每个消费者都会定时去触发Rebalance，以避免Rebalance通知失效。也就是说假如某个消费者没有收到某次的Rebalance请求，但是它自己也会周期性的进行Rebalance,默认时间是20秒
+
+#### 
+
+
+
+#### 代码层次看消费者Rebalance
+
+[代码位置在：DefaultMQPushConsumerImpl.java](https://github.com/apache/rocketmq/blob/master/client/src/main/java/org/apache/rocketmq/client/impl/consumer/DefaultMQPushConsumerImpl.java)
+
+##### 消费者启动时触发Rebalance
+
+```java
+ public synchronized void start() throws MQClientException {
+ 
+	//1.....各种启动准备工作，省略
+   
+   // 2 从nameServer更新topic路由信息，收集到了Rebalance所需要的队列信息
+   this.updateTopicSubscribeInfoWhenSubscriptionChanged();
+   // 3 检查consumer配置，比如consumer要使用SQL92过滤，但是broker没有开启，则broker会返回错误
+   this.mQClientFactory.checkClientInBroker();
+   // 4 向每个broker发送心跳信息，将自己加入消费者组
+   this.mQClientFactory.sendHeartbeatToAllBrokerWithLock();
+   // 5 立刻触发一次Rebalance（在2和4的基础上）
+   this.mQClientFactory.rebalanceImmediately();
+   
+ }
+```
+
+##### 消费者停止时触发Rebalance
+
+[代码位置在：DefaultMQPushConsumerImpl.java](https://github.com/apache/rocketmq/blob/master/client/src/main/java/org/apache/rocketmq/client/impl/consumer/DefaultMQPushConsumerImpl.java)
+
+```java
+public void shutdown() {
+  shutdown(0);
+}
+
+public synchronized void shutdown(long awaitTerminateMillis) {
+  switch (this.serviceState) {
+    case CREATE_JUST:
+      break;
+    case RUNNING:
+      //1、停止挣扎消费中的消息
+      this.consumeMessageService.shutdown(awaitTerminateMillis);
+      //2、持久化offset，因为offset默认是异步提交的，为了避免重复消费，在关闭时进行offset持久化
+      this.persistConsumerOffset();
+      //3、向broker发送取消注册consumer的请求，这个时候broker会通知当前消费者组下的其它消费者进行Rebalance
+      this.mQClientFactory.unregisterConsumer(this.defaultMQPushConsumer.getConsumerGroup());
+      //4、关闭与nameServer和broker的连接
+      this.mQClientFactory.shutdown();
+      log.info("the consumer [{}] shutdown OK", this.defaultMQPushConsumer.getConsumerGroup());
+      //5、对其尚未处理的消息
+      this.rebalanceImpl.destroy();
+      this.serviceState = ServiceState.SHUTDOWN_ALREADY;
+      break;
+    case SHUTDOWN_ALREADY:
+      break;
+    default:
+      break;
+  }
+}
+```
+
+##### 消费者运行时定时任务触发Rebalance
+
+[代码位置在RebalanceService中](https://github.com/apache/rocketmq/blob/master/client/src/main/java/org/apache/rocketmq/client/impl/consumer/RebalanceService.java)
+
+```java
+public class RebalanceService extends ServiceThread {
+  // 默认时间是20秒
+    private static long waitInterval =
+        Long.parseLong(System.getProperty(
+            "rocketmq.client.rebalance.waitInterval", "20000"));
+    private final InternalLogger log = ClientLogger.getLog();
+    private final MQClientInstance mqClientFactory;
+
+    public RebalanceService(MQClientInstance mqClientFactory) {
+        this.mqClientFactory = mqClientFactory;
+    }
+
+    @Override
+    public void run() {
+        log.info(this.getServiceName() + " service started");
+				// 在消费者没有停止的情况下，也就是死循环的方式进行每隔20秒触发一次
+        while (!this.isStopped()) {
+          // 等待时间间隔，如果被唤醒则无需等待，直接触发
+            this.waitForRunning(waitInterval);
+          // 触发Rebalance
+            this.mqClientFactory.doRebalance();
+        }
+
+        log.info(this.getServiceName() + " service end");
+    }
+
+    @Override
+    public String getServiceName() {
+        return RebalanceService.class.getSimpleName();
+    }
+}
+```
+
+##### 运行时监听到消费者数量发生变化触发Rebalance
+
+[代码位置在ClientRemotingProcessor中](https://github.com/apache/rocketmq/blob/master/client/src/main/java/org/apache/rocketmq/client/impl/ClientRemotingProcessor.java)
+
+消费者数量变化时，Broker给客户端的通知，也就是下面的步骤二。在收到通知后，其调用notifyConsumerIdsChanged进行处理，这个方法内部会立即触发Rebalance。
+
+```java
+public class ClientRemotingProcessor extends AsyncNettyRequestProcessor implements NettyRequestProcessor {
+    private final InternalLogger log = ClientLogger.getLog();
+    private final MQClientInstance mqClientFactory;
+
+    public ClientRemotingProcessor(final MQClientInstance mqClientFactory) {
+        this.mqClientFactory = mqClientFactory;
+    }
+
+    @Override
+    public RemotingCommand processRequest(ChannelHandlerContext ctx,
+        RemotingCommand request) throws RemotingCommandException {
+        switch (request.getCode()) {
+            // 1、检查事物消息状态
+            case RequestCode.CHECK_TRANSACTION_STATE:
+                return this.checkTransactionState(ctx, request);
+            // 2、通知消费者数量发生变化，内部会触发Rebalance
+            case RequestCode.NOTIFY_CONSUMER_IDS_CHANGED:
+                return this.notifyConsumerIdsChanged(ctx, request);
+            // 3、重置消费者offset
+            case RequestCode.RESET_CONSUMER_CLIENT_OFFSET:
+                return this.resetOffset(ctx, request);
+            // 4、获得消费者状态
+            case RequestCode.GET_CONSUMER_STATUS_FROM_CLIENT:
+                return this.getConsumeStatus(ctx, request);
+						// 5、获得消费者运行时信息
+            case RequestCode.GET_CONSUMER_RUNNING_INFO:
+                return this.getConsumerRunningInfo(ctx, request);
+						// 6、直接消费信息 
+            case RequestCode.CONSUME_MESSAGE_DIRECTLY:
+                return this.consumeMessageDirectly(ctx, request);
+
+            case RequestCode.PUSH_REPLY_MESSAGE_TO_CLIENT:
+                return this.receiveReplyMessage(ctx, request);
+            default:
+                break;
+        }
+        return null;
+    }
+    //.....省略下面的
+```
+
+监听到变化后，触发Rebalance的代码如下：
+
+```java
+ public RemotingCommand notifyConsumerIdsChanged(ChannelHandlerContext ctx,
+        RemotingCommand request) throws RemotingCommandException {
+        try {
+            final NotifyConsumerIdsChangedRequestHeader requestHeader =
+                (NotifyConsumerIdsChangedRequestHeader) request.decodeCommandCustomHeader(NotifyConsumerIdsChangedRequestHeader.class);
+            log.info("receive broker's notification[{}], the consumer group: {} changed, rebalance immediately",
+                RemotingHelper.parseChannelRemoteAddr(ctx.channel()),
+                requestHeader.getConsumerGroup());
+          // 立刻触发一次Rebalance请求
+            this.mqClientFactory.rebalanceImmediately();
+        } catch (Exception e) {
+            log.error("notifyConsumerIdsChanged exception", RemotingHelper.exceptionSimpleDesc(e));
+        }
+        return null;
+    }
+
+```
+
+#### doRebalance具体实现
+
+##### doRebalance的具体实现
+
+代码在：RebalanceImpl中
+
+在为每个topic触发Rebalance的时候，会传入一个topic 名称，还有一个是否有序的标志isOrder
+
+对于push模式，会区分当前指定的消息监听器是否有序
+
+对于pull模式，总是认为无序的，所以传入的总是false
+
+```java
+public void doRebalance(final boolean isOrder) {
+        Map<String, SubscriptionData> subTable = this.getSubscriptionInner();
+        if (subTable != null) {
+          	// 某个消费者下面所有订阅的topic
+            for (final Map.Entry<String, SubscriptionData> entry : subTable.entrySet()) {
+                final String topic = entry.getKey();
+                try {
+                  // 为每一个topic逐一触发Rebalance，也就是按照topic维度进行Rebalance的
+                    this.rebalanceByTopic(topic, isOrder);
+                } catch (Throwable e) {
+                    if (!topic.startsWith(MixAll.RETRY_GROUP_TOPIC_PREFIX)) {
+                        log.warn("rebalanceByTopic Exception", e);
+                    }
+                }
+            }
+        }
+
+        this.truncateMessageQueueNotMyTopic();
+    }
+```
+
+
+
+##### 按照topic维度进行Rebalance的问题？
+
+如果一个消费者组订阅多个Topic，可能会出现分配不均，部分消费者处于空闲状态。
+
+比如：某个消费者组group_X下有4个消费者实例Consumer_1到Consumer_4，订阅了2个topic分别是：TopicA和TopicB,而每个topic都有2个队列，也就是topic A和topic B总共有4个队列，四个队列对应了4个消费者，也就是每个消费者1个队列。
+
+但是真实的情况是：按照topic维度统计，只会有两个消费者拿到了队列，拿到队列的消费者分别占了topic A和topic B一个，而其它的都闲置了。
+
+
+
+**由于订阅多个Topic时可能会出现分配不均，这是在RocketMQ中我们为什么不建议同一个消费者组订阅多个Topic的重要原因**。在这一点上，Kafka与不RocketMQ同，其是将所有Topic下的所有队列合并在一起，进行Rebalance，因此相对会更加平均。
+
+##### 按照topicRebalance的源码
+
+```java
+private void rebalanceByTopic(final String topic, final boolean isOrder) {
+        switch (messageModel) {
+            case BROADCASTING: {
+ 							// 广播模式，省略代码...........
+            }
+            case CLUSTERING: {
+              // 集群模式下获取：mqSet是当前topic下所有队列的集合
+                Set<MessageQueue> mqSet = this.topicSubscribeInfoTable.get(topic);
+              // cidAll是当前消费者组下所有消费者实例的ID
+                List<String> cidAll = this.mQClientFactory.findConsumerIdList(topic, consumerGroup);
+              // 判空
+                if (null == mqSet) {
+                    if (!topic.startsWith(MixAll.RETRY_GROUP_TOPIC_PREFIX)) {
+                        log.warn("doRebalance, {}, but the topic[{}] not exist.", consumerGroup, topic);
+                    }
+                }
+ 							// 判空
+                if (null == cidAll) {
+                    log.warn("doRebalance, {} {}, get consumer id list failed", consumerGroup, topic);
+                }
+
+                if (mqSet != null && cidAll != null) {
+                    List<MessageQueue> mqAll = new ArrayList<MessageQueue>();
+                    mqAll.addAll(mqSet);
+										// 1、给队列和消费者实例ID排序
+                    Collections.sort(mqAll);
+                    Collections.sort(cidAll);
+										// 2、通过AllocateMessageQueueStrategy策略进行预分配
+                    AllocateMessageQueueStrategy strategy = this.allocateMessageQueueStrategy;
+
+                    List<MessageQueue> allocateResult = null;
+                    try {
+                        allocateResult = strategy.allocate(
+                            this.consumerGroup,
+                            this.mQClientFactory.getClientId(),
+                            mqAll,
+                            cidAll);
+                    } catch (Throwable e) {
+                        log.error("AllocateMessageQueueStrategy.allocate Exception. allocateMessageQueueStrategyName={}", strategy.getName(),
+                            e);
+                        return;
+                    }
+										// 3、分配结果去重处理
+                    Set<MessageQueue> allocateResultSet = new HashSet<MessageQueue>();
+                    if (allocateResult != null) {
+                        allocateResultSet.addAll(allocateResult);
+                    }
+										// 4、根据预分配结果尝试更新ProcessQueueTable，并返回true或者false标志是否发生变化
+                    boolean changed = this.updateProcessQueueTableInRebalance(topic, allocateResultSet, isOrder);			
+                  	// 5、如果分配结果发生变化，则进行后续处理。因为有些经过Rebalance可能没有发生变化
+                    if (changed) {
+                        log.info(
+                            "rebalanced result changed. allocateMessageQueueStrategyName={}, group={}, topic={}, clientId={}, mqAllSize={}, cidAllSize={}, rebalanceResultSize={}, rebalanceResultSet={}",
+                            strategy.getName(), consumerGroup, topic, this.mQClientFactory.getClientId(), mqSet.size(), cidAll.size(),
+                            allocateResultSet.size(), allocateResultSet);
+                        this.messageQueueChanged(topic, mqSet, allocateResultSet);
+                    }
+                }
+                break;
+            }
+            default:
+                break;
+        }
+    }
+```
+
+在上面的源码中，我们总共分了5步，下面重点说下步骤2，AllocateMessageQueueStrategy接口有多种实现，分别是：
+
+- AllocateMessageQueueAveragely平均分配，默认策略
+- AllocateMessageQueueAveragelyByCircle循环分配
+- AllocateMessageQueueConsistentHash一致性hash
+- AllocateMessageQueueByConfig按照配置分配，也就是手动分配
+- AllocateMessageQueueByMachineRoom 按照机房分配
+
+##### 每个实例自己分配队列的代码
+
+其实思路很简单，一个消费者组下面，所有的队列是一定的，比如1-10，而传入的消费者组的list也是一样的，这样可以通过hash进行取值
+
+```java
+public class AllocateMessageQueueAveragelyByCircle implements AllocateMessageQueueStrategy {
+    private final InternalLogger log = ClientLogger.getLog();
+
+    @Override
+    public List<MessageQueue> allocate(String consumerGroup, String currentCID, List<MessageQueue> mqAll,
+        List<String> cidAll) {
+        if (currentCID == null || currentCID.length() < 1) {
+            throw new IllegalArgumentException("currentCID is empty");
+        }
+        if (mqAll == null || mqAll.isEmpty()) {
+            throw new IllegalArgumentException("mqAll is null or mqAll empty");
+        }
+        if (cidAll == null || cidAll.isEmpty()) {
+            throw new IllegalArgumentException("cidAll is null or cidAll empty");
+        }
+
+        List<MessageQueue> result = new ArrayList<MessageQueue>();
+        if (!cidAll.contains(currentCID)) {
+            log.info("[BUG] ConsumerGroup: {} The consumerId: {} not in cidAll: {}",
+                consumerGroup,
+                currentCID,
+                cidAll);
+            return result;
+        }
+				// 查看当前实例ID的位置
+        int index = cidAll.indexOf(currentCID);
+        for (int i = index; i < mqAll.size(); i++) {
+          // 循环加入分配结果
+            if (i % cidAll.size() == index) {
+                result.add(mqAll.get(i));
+            }
+        }
+        return result;
+    }
+
+    @Override
+    public String getName() {
+        return "AVG_BY_CIRCLE";
+    }
+}
+```
 
 
 
