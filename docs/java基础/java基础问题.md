@@ -1959,6 +1959,8 @@ protected synchronized Class<?> loadClass(String name,boolean resolve)throws Cla
 JDK 中也有较大规模破坏双亲模型的情况，例如线程上下文类加载器（**Thread Context ClassLoader**）的出现
 
 
+
+
 ### 正则表达式
 #### 正则预编译
 

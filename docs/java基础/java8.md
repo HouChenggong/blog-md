@@ -194,3 +194,73 @@ public static void main(String[] args) {
     }
 ```
 
+### [函数式编程](https://mp.weixin.qq.com/s/Ko41OG9yFAZZMEi6-C9kBQ)
+
+实现面向对象编程不一定非得使用面向对象编程语言，同理，实现函数式编程也不一定非得使用函数式编程语言。现在，很多面向对象编程语言，也提供了相应的语法、类库来支持函数式编程。
+
+Java这种面向对象编程语言，对函数式编程的支持可以通过一个例子来描述：
+
+```java
+
+public class Demo {
+  public static void main(String[] args) {
+    Optional<Integer> result = Stream.of("a", "be", "hello")
+            .map(s -> s.length())
+            .filter(l -> l <= 3)
+            .max((o1, o2) -> o1-o2);
+    System.out.println(result.get()); // 输出2
+  }
+}
+```
+
+Java为函数式编程引入了三个新的语法概念：Stream类、Lambda表达式和函数接口（Functional Inteface）
+
+#### 函数接口@FunctionalInterface
+
+函数式接口也是Java interface的一种，但还需要满足：
+
+- 一个函数式接口只有一个抽象方法(single abstract method)；
+
+- Object类中的public abstract method不会被视为单一的抽象方法；
+
+- 函数式接口可以有默认方法和静态方法；
+
+- 函数式接口可以用@FunctionalInterface注解进行修饰。
+
+#### 函数式接口的作用
+
+函数式接口有什么用呢？一句话，函数式接口带给我们最大的好处就是：可以使用极简的lambda表达式实例化接口。为什么这么说呢？我们或多或少使用过一些只有一个抽象方法的接口，比如Runnable、ActionListener、Comparator等等，比如我们要用Comparator实现排序算法，我们的处理方式通常无外乎两种：
+
+- 规规矩矩的写一个实现了Comparator接口的Java类去封装排序逻辑。若业务需要多种排序方式，那就得写多个类提供多种实现，而这些实现往往只需使用一次。
+
+- 另外一种聪明一些的做法无外乎就是在需要的地方搞个匿名内部类，比如：
+
+```java
+
+public class Test { 
+    public static void main(String args[]) { 
+        List<Person> persons = new ArrayList<Person>();
+        Collections.sort(persons, new Comparator<Person>(){
+            @Override
+            public int compare(Person o1, Person o2) {
+                return Integer.compareTo(o1.getAge(), o2.getAge());
+            }
+        });
+    } 
+}
+```
+
+而使用函数式接口的lambda快速实现上面的逻辑代码如下：
+
+```java
+Comparator<Person> comparator = (p1, p2) -> Integer.compareTo(p1.getAge(), p2.getAge());
+```
+
+#### @FunctionalInterface注解使用场景
+
+我们知道，一个接口只要满足只有一个抽象方法的条件，即可以当成函数式接口使用，有没有 @FunctionalInterface 都无所谓。但是jdk定义了这个注解肯定是有原因的，对于开发者，该注解的使用一定要三思而后续行。
+
+如果使用了此注解，再往接口中新增抽象方法，编译器就会报错，编译不通过。换句话说，@FunctionalInterface 就是一个承诺，承诺该接口世世代代都只会存在这一个抽象方法。因此，凡是使用了这个注解的接口，开发者可放心大胆的使用Lambda来实例化。当然误用 @FunctionalInterface 带来的后果也是极其惨重的：如果哪天你把这个注解去掉，再加一个抽象方法，则所有使用Lambda实例化该接口的客户端代码将全部编译错误。
+
+特别地，当某接口只有一个抽象方法，但没有用 @FunctionalInterface 注解修饰时，则代表别人没有承诺该接口未来不增加抽象方法，所以建议不要用Lambda来实例化，还是老老实实的用以前的方式比较稳妥。
+

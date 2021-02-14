@@ -6,8 +6,12 @@
 
 这个是介绍RocketMQ基础、高可用、还有相关原理的整合文章，同时希望读的时候带着下面的问题
 
+同时相关RocketMQ的原理和功能可以参考：[阿里云企业级RocketMQ实战](https://help.aliyun.com/product/29530.html?spm=a2c4g.11186623.6.540.4dfb307dJsuSbK)
+
 | QA                                     | 关联QA                                                | 说明 | 其它 |
 | -------------------------------------- | ----------------------------------------------------- | ---- | ---- |
+| RocketMQ和Kafka的区别？                |                                                       |      |      |
+|                                        | 为啥在Kafka大量使用的今天选择rocketMQ?                |      |      |
 | 为啥RocketMQ要单独写一个NameServer？   |                                                       |      |      |
 |                                        | NameServer遵循的是CAP中的哪个？                       |      |      |
 |                                        | NameServer如何保证最终一致性？                        |      |      |
@@ -164,6 +168,21 @@
 
   - VKMQ 提供类似 X/Open XA 的分布事务功能，通过 VKMQ 事务消息能达到分布式事务的最终一致。
 
+  - [事物消息最佳实战](https://mp.weixin.qq.com/s/ljSktiZYh_5W93m3yB4M-g)
+
+  - 事物消息性能不如普通消息，事实上它会在内部产生3个消息（一阶段1个，二阶段2个），性能只有普通消息的1/3，如果事物消息体量大的话，做好容量规划
+
+  - 最后有一些参数注意事项。在 Broker 的配置中：
+
+    - transientStorePoolEnable 这个参数必须保持默认值 false，否则会有严重的问题。
+    - endTransactionThreadPoolNums是事务消息二阶段处理线程大小，sendMessageThreadPoolNums 则指定一阶段处理线程池大小。如果二阶段的处理速度跟不上一阶段，就会造成二阶段消息丢失导致大量回查，所以建议 endTransactionThreadPoolNums 应该大于 sendMessageThreadPoolNums，建议至少 4 倍。
+    - useReentrantLockWhenPutMessage 设置为 true（默认值是 false），以免线程抢锁出现严重的不公平，导致二阶段处理线程长时间抢不到锁。
+    - transactionTimeOut 默认值 6 秒太短了，如果事务执行时间超过 6 秒，就可能导致消息丢失。建议改到 1 分钟左右。
+
+     
+
+    生产者 Client 也有一个注意事项，如果有多组 Broker，并且是 2 副本（有 1 个 Slave），应该打开 retryAnotherBrokerWhenNotStoreOK，以免某个 Slave 出现故障以后，大量消息发送失败。
+
 ##### 批量处理消息
 
   - 一批消息只会被一个队列消费，另一个队列消费不到
@@ -250,11 +269,12 @@ Producer——【Broker OS Cache ——磁盘】——Consumer
 - 可能丢消息场景一：
   - 1~4 在异步刷盘的模式下会丢少量消息；
   - 同步刷盘模式下不会丢消息。
-
 - 可能丢消息场景二：
   - 5~6 属于单点故障，一旦发生，该节点上的消息全部丢失，如果开启了主从，则可去从节点消费消息；
   - 如果开启了异步复制机制，VKMQ只丢少量消息。
 - 建议：如果严格要求不丢失消息，开启同步刷盘，但是并发会下降很多，但是无论是哪种刷盘模式都要开启主从
+
+目前RocketMQ存储模型使用本地磁盘进行存储，数据写入为producer -> direct memory -> pagecache -> 磁盘，数据读取如果pagecache有数据则直接从pagecache读，否则需要先从磁盘加载到pagecache中
 
 #### 3-Consumer——Broker消费消息
 
@@ -925,9 +945,24 @@ Producer将消息投递到Broker中，Broker在收到用户发送的消息后，
 
 目前可以作为服务发现的组件有很多，比如Zookeper、consul等，那为啥RocketMQ要单独开发一个呢？
 
+其实在最开始RocketMQ选择的也是Zookeper，但是繁杂的运行机制和过多的依赖导致RocketMQ最终自己开发了一个零依赖、更简洁的NameServer
+
 - RocketMQ的架构设置决定了只需要一个轻量级的元数据服务器就足够了，只需要保证最终一致性，而不需要像Zookeeper这样的强一致性方案，因此不需要依赖另外一个中间价，降低了维护成本
 - 也就是说RocketMQ在CAP理论中，选择了AP而非CP（Consistency一致性，Availability可用性，Partition分区容错性）。即只要不是所有的nameserver都挂了，rocketMQ还能使用
 - 另外说下kafka目前也在做一个方案就是替换掉zookeeper
+
+
+
+| 功能         | zookeeper                            | RocketMQ       |
+| ------------ | ------------------------------------ | -------------- |
+| 配置保存     | 持久化到磁盘                         | 保存在内存中   |
+| 是否支持选举 | 是                                   | 否             |
+| 数据一致性   | 强一致                               | 最终一致性     |
+| 高可用       | 是                                   | 是             |
+| 设计逻辑     | Raft选举，逻辑复杂难懂，排查问题较难 | CRUD，仅此而已 |
+|              |                                      |                |
+
+
 
 #### 2、NameServer如何保证最终一致性？
 
@@ -1022,4 +1057,14 @@ public MessageQueue selectOneMessageQueue(final String lastBrokerName) {
 
 故：有序消息如果进行重试会带来短暂的无序，这个是不进行重试的一个原因，另一个重要的原因是：对于这些有序消息由于发送的时候只会发送到某个特定的Queue中，如果发送失败，重试失败的可能性依然很大，所以默认不重试，如果需要重试，则可以代码中手动重试。 
 
-#### 5、为啥
+#### 5、为啥选用RocketMQ？和Kafka的区别？
+
+在引入 RocketMQ 之前，很多公司已经在大量的使用 Kafka 了，但并非所有情况下 Kafka 都是最合适的，比如以下场景：
+
+- 业务希望个别消费失败以后可以重试，并且不堵塞后续其它消息的消费。
+- 业务希望消息可以延迟一段时间再投递。
+- 业务需要发送的时候保证数据库操作和消息发送是一致的（也就是事务发送）。
+- 为了排查问题，有的时候业务需要一定的单个消息查询能力。
+  - rocketMQ提供了按照消息ID、消息key、topic三种查询的方式
+  - 另外找到了之后也可以进行回溯消费
+

@@ -21,3 +21,9 @@
 
 - 节点间通信的方式。两个节点由很多长期存在的TCP连接组成。而且，ES要求这些连接需要保持open的状态
 
+
+
+### ELK 
+
+[ELK接入](https://www.jianshu.com/p/203447e25ad5?utm_campaign=hugo)
+
