@@ -910,15 +910,63 @@ hashcode有自己的一套算法，当然一个对象无论计算多少次，has
 **基本类型有**：byte、short、char、int、long、boolean。
 **基本类型的包装类分别是**：Byte、Short、Character、Integer、Long、Boolean。
 
-对于int short long  byte 都是-128 到127之间
+对于int short long  byte 都是-128 到127之间,具体代码在valueOf里面
 
-但是对于double没有实现常量池技术
+```java
+//low =-128 high=127   
+public static Integer valueOf(int i) {
+        if (i >= IntegerCache.low && i <= IntegerCache.high)
+            return IntegerCache.cache[i + (-IntegerCache.low)];
+        return new Integer(i);
+    }
+
+// 常量池技术
+//从这2段代码可以看出，在通过valueOf方法创建Integer对象的时候，如果数值在[-128,127]之间，
+//便返回指向IntegerCache.cache中已经存在的对象的引用；否则创建一个新的Integer对象。
+
+
+ private static class IntegerCache {
+        static final int low = -128;
+        static final int high;
+        static final Integer cache[];
+
+        static {
+            // high value may be configured by property
+            int h = 127;
+            String integerCacheHighPropValue =
+                sun.misc.VM.getSavedProperty("java.lang.Integer.IntegerCache.high");
+            if (integerCacheHighPropValue != null) {
+                try {
+                    int i = parseInt(integerCacheHighPropValue);
+                    i = Math.max(i, 127);
+                    // Maximum array size is Integer.MAX_VALUE
+                    h = Math.min(i, Integer.MAX_VALUE - (-low) -1);
+                } catch( NumberFormatException nfe) {
+                    // If the property cannot be parsed into an int, ignore it.
+                }
+            }
+            high = h;
+
+            cache = new Integer[(high - low) + 1];
+            int j = low;
+            for(int k = 0; k < cache.length; k++)
+                cache[k] = new Integer(j++);
+
+            // range [-128, 127] must be interned (JLS7 5.1.7)
+            assert IntegerCache.high >= 127;
+        }
+
+        private IntegerCache() {}
+    }
+```
+
+但是对于double没有实现常量池技术，为啥double没有实现常量池技术呢，因为Int在一个范围内的数量是有限的，而double在一个范围内的数量是无限的，类似的还有Float
 
 - == 和equal在数字类型的比较
   - 当 "=="运算符的两个操作数都是 包装器类型的引用，则是比较指向的是否是同一个对象，而如果其中有一个操作数是表达式（即包含算术运算）则比较的是数值（即会触发自动拆箱的过程）
 
 ```java
-     Integer a = 1;
+        Integer a = 1;
         Integer b = 2;
         Integer c = 3;
         System.out.println(c == (a + b));//有运算符号，==比较的变为值，所以是true
@@ -1186,6 +1234,8 @@ System.out.println(copyUser2.toString());
 - 原来字符串的switch是通过`equals()`和`hashCode()`方法来实现的。。**记住，switch中只能使用整型**
 
 **其实switch只支持一种数据类型，那就是整型，其他数据类型都是转换成整型之后在使用switch的。**
+
+为啥不用Long类型比较，因为String在比较的时候计算的是hash值计算的hashcode，如果hashcode一致再比较equals
 
 ### 快速失败、快速安全
 
