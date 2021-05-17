@@ -264,3 +264,191 @@ Comparator<Person> comparator = (p1, p2) -> Integer.compareTo(p1.getAge(), p2.ge
 
 特别地，当某接口只有一个抽象方法，但没有用 @FunctionalInterface 注解修饰时，则代表别人没有承诺该接口未来不增加抽象方法，所以建议不要用Lambda来实例化，还是老老实实的用以前的方式比较稳妥。
 
+### CompletableFuture
+
+#### Future不足之处
+
+```java
+public interface Future<V> {
+    boolean cancel(boolean var1);
+
+    boolean isCancelled();
+
+    boolean isDone();
+
+    V get() throws InterruptedException, ExecutionException;
+
+    V get(long var1, TimeUnit var3) throws InterruptedException, ExecutionException, TimeoutException;
+}
+```
+
+Future需要通过isDone()来判断任务是否执行完成, 或者调用get()阻塞地获取执行结果, 且仅是单个异步任务的处理, 它很难直接表述多个Future 结果之间的依赖性。
+
+实际开发中，我们经常需要达成以下目的：
+
+- 希望得到异步执行结果, 但不希望轮询 isDone() 或 get() 阻塞当前线程
+- 多个异步任务之间存在依赖关系, 例如一个异步任务结束后, 结果作为参数, 执行下个异步任务
+- 多个异步任务都完成后, 才能继续进行其他处理
+- 多个异步任务有任意任务完成, 则立即返回结果或执行其他操作
+- 立即完成某个异步任务并提供返回值
+- 响应异步任务的完成事件, 即在异步任务执行完成后, 立即进行下一步操作
+
+#### CompletionStage方法梳理
+
+```java
+//1 当前异步任务执行完成后, 再执行传入的任务
+public <U> CompletionStage<U> thenApply(Function<? super T,? extends U> fn);
+public CompletionStage<Void> thenAccept(Consumer<? super T> action);
+public CompletionStage<Void> thenRun(Runnable action);
+public <U> CompletionStage<U> thenCompose(Function<? super T, ? extends CompletionStage<U>> fn);
+
+//2 当前阶段和给定阶段other, 那个先执行完了, 就用哪个的返回值进行下一步操作
+public <U> CompletionStage<U> applyToEither(CompletionStage<? extends T> other, Function<? super T, U> fn);
+public CompletionStage<Void> acceptEither(CompletionStage<? extends T> other, Consumer<? super T> action);
+public CompletionStage<Void> runAfterEither(CompletionStage<?> other, Runnable action);
+
+//3 当前阶段和给定阶段other都正常完成时，在执行传入的任务
+public <U,V> CompletionStage<V> thenCombine(CompletionStage<? extends U> other, BiFunction<? super T,? super U,? extends V> fn);
+public <U> CompletionStage<Void> thenAcceptBoth(CompletionStage<? extends U> other, BiConsumer<? super T, ? super U> action);
+public CompletionStage<Void> runAfterBoth(CompletionStage<?> other, Runnable action);
+
+//4 当前阶段运行完成或者抛出异常的时候，执行相关操作
+public CompletionStage<T> exceptionally(Function<Throwable, ? extends T> fn); 
+public CompletionStage<T> whenComplete(BiConsumer<? super T, ? super Throwable> action); 
+public <U> CompletionStage<U> handle(BiFunction<? super T, Throwable, ? extends U> fn);
+
+```
+
+#### CompletableFuture方法梳理
+
+```java
+//异步发起任务
+public static CompletableFuture runAsync(Runnable runnable)
+public static CompletableFuture supplyAsync(Supplier supplier)
+//获取执行结果
+public static CompletableFuture allOf(CompletableFuture... cfs) 
+public static CompletableFuture<Object> anyOf(CompletableFuture<?>... cfs)
+//强制结束
+public boolean complete(T value) 完成 
+public boolean completeExceptionally(Throwable ex) 异常 
+public boolean cancel(boolean mayInterruptIfRunning) 取消
+
+```
+
+#### CompletableFuture代码示例
+
+```java
+import java.util.concurrent.CompletableFuture;
+
+/**
+ * Description
+ * <p>
+ * </p>
+ * DATE 2021/5/17.
+ *
+ * @author xiyou.
+ */
+public class CompletableFutureDemo {
+    public static void main(String[] args) throws Exception {
+        CompletableFuture
+                .supplyAsync(() -> {
+                    String dangao = "cake";
+                    System.out.println("师傅准备做蛋糕:" + dangao);
+                    try {
+                        Thread.sleep(1000);
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                    System.out.println("师傅已经做好了蛋糕" + dangao);
+                    return dangao;
+                })
+                .thenAccept(cake -> {
+                    System.out.println("我吃蛋糕:" + cake);
+                });
+        System.out.println("我先去喝牛奶");
+        Thread.currentThread().join();
+    }
+}
+
+//师傅准备做蛋糕:cake
+//我先去喝牛奶
+//师傅已经做好了蛋糕cake
+//我吃蛋糕:cake
+```
+
+```java
+import java.util.concurrent.CompletableFuture;
+
+/**
+ * Description
+ * <p>
+ * </p>
+ * DATE 2021/5/17.
+ *
+ * @author xiyou.
+ */
+public class CompletableFutureDemo2 {
+    public static void main(String[] args) throws Exception {
+        CompletableFuture<String> makeCake = CompletableFuture
+                .supplyAsync(() -> {
+                    String dangao = "cake";
+                    System.out.println("师傅准备做蛋糕" + dangao);
+                    try {
+                        Thread.sleep(5000);
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                    System.out.println("师傅做好了蛋糕" + dangao);
+                    return dangao;
+                });
+        CompletableFuture
+                .supplyAsync(() -> {
+                    String niuNai = "milk";
+                    System.out.println("我自己开始做牛奶" + niuNai);
+                    try {
+                        Thread.sleep(1000);
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                    System.out.println("我把牛奶煮好了" + niuNai);
+                    return niuNai;
+                })
+                .thenAcceptBothAsync(makeCake, (milk, cake) -> {
+                    System.out.println(milk + "做好了");
+                    System.out.println(cake + "做好了");
+                    System.out.println("我开始吃早餐");
+                })
+                .thenRunAsync(() -> {
+                    System.out.println("我已经把早餐吃完了，去上班了");
+                });
+        Thread.currentThread().join();
+    }
+}
+```
+
+```java
+师傅准备做蛋糕cake
+我自己开始做牛奶milk
+我把牛奶煮好了milk
+师傅做好了蛋糕cake
+milk做好了
+cake做好了
+我开始吃早餐
+我已经把早餐吃完了，去上班了
+```
+
+
+
+#### CompletableFuture in Java9
+
+```java
+增加了超时相关处理
+
+- public CompletableFuture<T> completeOnTimeout(T value, long timeout, TimeUnit unit)
+如果未在给定超时之前完成，则使用给定值完成此CompletableFuture。
+
+- public CompletableFuture<T> orTimeout(long timeout, TimeUnit unit)
+如果未在给定超时之前完成，则使用TimeoutException异常完成此CompletableFuture。
+
+```
+
