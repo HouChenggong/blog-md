@@ -68,6 +68,7 @@ du -h --max-depth=1
   // 一样查询
   cat xxx.log | grep 'xxxText'
   
+  ```
 ```
   
 
@@ -75,7 +76,7 @@ du -h --max-depth=1
 
 - head 命令是用来获取文本文件的开始n行。
 
-```java
+​```java
 head -10000 java.log > javaHead.log
 ```
 
@@ -101,6 +102,19 @@ split -l 300 java.txt javaLog --verbose
 
 ```java
 split -d 10m java.txt javaLog --verbose
+```
+
+#### 日志搜索
+
+```java
+less xxx.log 
+然后输入《/》直接复制进去错误的日志，比如《手机离职审批接口失败》
+然后它自己就会跳转到相关的错误日志
+```
+
+```java
+//直接搜索相关错误日志
+grep -C 20 "手机离职审批接口失败" eim-ad-inventory.log
 ```
 
 
