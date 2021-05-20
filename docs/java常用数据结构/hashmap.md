@@ -542,7 +542,18 @@ public ListNode reverseList(ListNode root) {
 
 推荐：[推荐阅读](https://juejin.im/post/5a66a08d5188253dc3321da0)
 
+##### 环形链表总结
 
+线程1标记好A是头节点，B是next节点之后
+
+线程2开始反转链表，结果就是B.next=A
+
+但是线程1又要开始执行：先让A变成头节点，然后让B变成头节点，B的下一个节点是A
+
+本来B的下一个节点是null循环也就结束了，但是由于线程2的缘故，B.next=A，没有结束，循环继续进行，又让A的下一个节点指向了B节点，所以变为A.next=B
+
+由此，环形链表出现：B.next=A; A.next=B 
+ 
 
 ## ConcurrentHashMap1.7
 

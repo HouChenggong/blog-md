@@ -432,7 +432,7 @@ public int hashCode() {
 
 简单的来说：String 类中使用 final 关键字修饰字符数组来保存字符串，`private final char value[]`，所以 String 对象是不可变的。
 
-> 补充（来自[issue 675](https://github.com/Snailclimb/JavaGuide/issues/675)）：在 Java 9 之后，String 类的实现改用 byte 数组存储字符串 `private final byte[] value`
+> 在 Java 9 之后，String 类的实现改用 byte 数组存储字符串 `private final byte[] value`
 >
 > 为什么使用byte字节而舍弃了char字符:
 >
@@ -1930,7 +1930,7 @@ public static void test44(){
 - 验证
   - 验证文件格式是否合法、变量名和方法是否重复等安全措施
 - 准备
-  - 给类的静态变量赋默认的初始值，比如 static int a=123;此阶段会把a的值设置为1
+  - 给类的静态变量赋默认的初始值，比如 static int a=123;此阶段会把a的值设置为0
 - 解析
   - 把符号引用换成直接引用
 
@@ -1999,6 +1999,8 @@ protected synchronized Class<?> loadClass(String name,boolean resolve)throws Cla
   双亲委派模型有一系列的优势，还是需要去破坏双亲委派模型。比如 ：基础类去调用回用户的代码。
 
 [破坏双亲委派模型实现类隔离](https://mp.weixin.qq.com/s/oK6A3viNP3XafEvl7rzjKA)
+
+总结：比如一个项目依赖了多个版本的C，启动的时候未选择理想的那个版本，类隔离技术是为了解决依赖冲突而诞生的，它通过自定义类加载器破坏双亲委派机制，然后利用类加载传导规则实现了不同模块的类隔离。
 
 #### SPI里面的JDBC
 
