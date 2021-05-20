@@ -89,7 +89,7 @@
 |             |                                        |                                                              |                                       |
 |             |                                        |                                                              |                                       |
 
-
+## Seata
 
 ### XA
 
@@ -98,97 +98,6 @@
 XA 协议是由 X/Open 组织提出的分布式事务处理规范，主要定义了事务管理器 TM 和局部资源管理器 RM 之间的接口
 
   XA协议同样也具备事务的ACID特性。
-
-```java
-import com.mysql.jdbc.jdbc2.optional.MysqlXADataSource;
-import com.mysql.jdbc.jdbc2.optional.MysqlXid;
- 
-import javax.sql.XAConnection;
-import javax.transaction.xa.XAResource;
-import javax.transaction.xa.Xid;
-import java.sql.Connection;
-import java.sql.Statement;
- 
-public class XADemo {
-    public static MysqlXADataSource getDataSource(String connStr, String user, String pwd) {
-        try {
- 
-            MysqlXADataSource ds = new MysqlXADataSource();
-            ds.setUrl(connStr);
-            ds.setUser(user);
-            ds.setPassword(pwd);
- 
-            return ds;
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
- 
-        return null;
-    }
- 
-    public static void main(String[] arg) {
-        String connStr1 = "jdbc:mysql://xxx:3306/wjq";
-        String connStr2 = "jdbc:mysql://xxx:3307/wjq";
- 
-        try {
-            //从不同数据库获取数据库数据源
-            MysqlXADataSource ds1 = getDataSource(connStr1, "root", "XXXXXXXX");
-            MysqlXADataSource ds2 = getDataSource(connStr2, "root", "XXXXXXXX");
- 
-            //数据库1获取连接
-            XAConnection xaConnection1 = ds1.getXAConnection();
-            XAResource xaResource1 = xaConnection1.getXAResource();
-            Connection connection1 = xaConnection1.getConnection();
-            Statement statement1 = connection1.createStatement();
- 
-            //数据库2获取连接
-            XAConnection xaConnection2 = ds2.getXAConnection();
-            XAResource xaResource2 = xaConnection2.getXAResource();
-            Connection connection2 = xaConnection2.getConnection();
-            Statement statement2 = connection2.createStatement();
- 
-            //创建事务分支的xid
-            Xid xid1 = new MysqlXid(new byte[]{0x01}, new byte[]{0x02}, 100);
-            Xid xid2 = new MysqlXid(new byte[]{0x011}, new byte[]{0x012}, 100);
- 
-            try {
-                //事务分支1关联分支事务sql语句
-                xaResource1.start(xid1, XAResource.TMNOFLAGS);
-                int update1Result = statement1.executeUpdate("UPDATE accounts SET BALANCE = CAST('9700.00' AS DECIMAL) WHERE CUSTOMER_NO = '001'");
-                xaResource1.end(xid1, XAResource.TMSUCCESS);
- 
-                //事务分支2关联分支事务sql语句
-                xaResource2.start(xid2, XAResource.TMNOFLAGS);
-                int update2Result = statement2.executeUpdate("INSERT INTO user_purchase_his(CUSTOMER_NO, SERIAL_NO, AMOUNT, CURRENCY, REMARK) "
-                        + " VALUES ('001', '20190303204700000001', 200, 'CNY', '购物消费')");
-                xaResource2.end(xid2, XAResource.TMSUCCESS);
- 
-                // 两阶段提交协议第一阶段
-                int ret1 = xaResource1.prepare(xid1);
-                int ret2 = xaResource2.prepare(xid2);
- 
-                // 两阶段提交协议第二阶段
-                if (XAResource.XA_OK == ret1 && XAResource.XA_OK == ret2) {
-                    //引擎级别提交
-                    xaResource1.commit(xid1, false);
-                    xaResource2.commit(xid2, false);
- 
-                    System.out.println("reslut1:" + update1Result + ", result2:" + update2Result);
-                } else {
-                    xaResource1.rollback(xid1);
-                    xaResource2.rollback(xid2);
-                }
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
-}
-```
-
-
 
 ### AT
 
@@ -244,8 +153,6 @@ AT 模式（[参考链接 TBD](http://seata.io/zh-cn/docs/dev/mode/tcc-mode.html
 ### 分布式事务总结
 
 Seata 的定位是分布式事全场景解决方案，未来还会有 XA 模式的分布式事务实现，每种模式都有它的适用场景，AT 模式是无侵入的分布式事务解决方案，适用于不希望对业务进行改造的场景，几乎0学习成本。TCC 模式是高性能分布式事务解决方案，适用于核心系统等对性能有很高要求的场景。Saga 模式是长事务解决方案，适用于业务流程长且需要保证事务最终一致性的业务系统，Saga 模式一阶段就会提交本地事务，无锁，长流程情况下可以保证性能，多用于渠道层、集成层业务系统。事务参与者可能是其它公司的服务或者是遗留系统的服务，无法进行改造和提供 TCC 要求的接口，也可以使用 Saga 模式。
-
- ### Seata实现原理
 
 #### seata 分布式ID实现原理
 
