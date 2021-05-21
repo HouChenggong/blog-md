@@ -73,7 +73,8 @@
 * 中间件
   - [ZK、CAP、ZAB](./docs/springCloud和dubbo/cap.md)
   - [dubbo](./docs/springCloud和dubbo/dubbo.md)
-  - [NIO](./docs/优秀开源框架/nio.md)
+  - [NIO](./docs/优秀开源框架/netty/nio.md)
+  - [mongo](./docs/优秀开源框架/mongo/mongo.md)
 * 其它
   * [一字型hash算法](./docs/其它/一致性hash算法.md)
   * [easyExcel动态多表头](./docs/其它/easyExcel动态多表头.md)
