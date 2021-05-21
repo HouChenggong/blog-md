@@ -75,6 +75,9 @@
   - [dubbo](./docs/springCloud和dubbo/dubbo.md)
   - [NIO](./docs/优秀开源框架/netty/nio.md)
   - [mongo](./docs/优秀开源框架/mongo/mongo.md)
+  - [ES- 基础](./docs/优秀开源框架/ES/ES6-4文档.md)
+  - [ES- SUG提示及ES7高级特性](./docs/优秀开源框架/ES/ES.6-4Suggest.md)
+  - [ES- 原理](./docs/优秀开源框架/ES/ES原理.md)
 * 其它
   * [一字型hash算法](./docs/其它/一致性hash算法.md)
   * [easyExcel动态多表头](./docs/其它/easyExcel动态多表头.md)
