@@ -137,7 +137,7 @@ DDL+volatile
 
 ### 可见性的用途
 
-或者双重校验的单例模型下，保证对象不重排序
+状态标志
 
 
 ##  volatile的5层实现原理
@@ -166,7 +166,11 @@ volatile读操作 LoadStoreBarrier   loadLoadBarrier
 
 
 
+内存屏障效果有：
 
+- 禁止volatile 修饰变量指令的重排序
+- 写入数据强制刷新到主存
+- 读取数据强制从主存读取
 
 
 
@@ -400,7 +404,7 @@ if (flag) { // step 3
 ![](./img/volatile.jpeg)
 
  
- 
+
 
 ##  JVM Happens-before原则：
 

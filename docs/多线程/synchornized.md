@@ -93,7 +93,7 @@ static synchronized void  test3(){
  }
 ```
 
-下面的字节码如下： **`flags: ACC_STATIC`**
+下面的字节码如下： **`flags: ACC_STATIC与 ACC_SYNCHRONIZED`**
 
 ```java
   static synchronized void test3();
@@ -523,7 +523,7 @@ A升级完成之后，A线程将继续从安全点继续执行代码，然后进
 
 ![](./img/monitor对象.jpg)
 
-
+https://mp.weixin.qq.com/s/ts2Pjz3VpWm50kY-Ru7iTA
 
 ```c
   ObjectMonitor() {
