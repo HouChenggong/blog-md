@@ -67,7 +67,7 @@
   - [基础算法](./docs/算法/基础算法.md)
   - [常用套路](./docs/算法总结.md)
 * 服务高可用
-  - [限流](./docs/秒杀相关/限流/限流.md)
+  - [限流算法](./docs/秒杀相关/限流/限流.md)
   - [Hystrix与Sentinel](./docs/优秀开源框架/Hystrix与sentinel/熔断限流.md)
   - [分布式事务](./docs/优秀开源框架/seata/分布式事务.md)
 * [常用英文词汇](./docs/常用英文词汇.md)
