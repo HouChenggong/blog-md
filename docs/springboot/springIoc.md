@@ -286,13 +286,25 @@ singletonsCurrentlyInCreation：创建中池，保存处于创建中的单例bea
 
 11. 到此完成A和B两个单例实例的创建。
 
+
+
+简单总结：用到了三个map一个set，三个map就是三级缓存，一个set就是创建中池，保存处于创建中的单例bean的BeanName。
+
+AB循环依赖对象创建流程：
+
+1. 先去set中添加A的name，然后用A构造器创建A并把A的BeanFactory放入map3中
+2. 然后发现依赖了B，查找B在三个map中都不存在而且不在set中，然后把B的name放入set中，然后用B的构造器把B创建，然后把B的BeanFactory放入map3中
+3. 然后B处理的过程中发现依赖A，但是此时A尚未创建完成，但是在set中发现了A的name，说明A在创建中
+4. 核心：出现循环依赖后，spring会优先完成一个对象的创建，比如利用map3中缓存的A对象的BeanFactory中的getObject方法返回的B实例注入到B中，完成B的实例化，同时在map2中添加A
+5. B实例创建完之后，把B从map3和set中移除，并将完整的实例放入map1中
+6. 然后把B实例注入到A中完成A的创建，并把A从map2中移除，放入map1中，然后AB都创建好了，实例最后都在map1中
+
 #### 三级缓存怎么用
 
 1. 先从一级缓存singletonObjects中去获取。（如果获取到就直接return）
 2. 如果获取不到或者对象正在创建中（isSingletonCurrentlyInCreation()），那就再从二级缓存earlySingletonObjects中获取。（如果获取到就直接return）
 3. 如果还是获取不到，且允许singletonFactories（allowEarlyReference=true）通过getObject()获取。就从三级缓存singletonFactory.getObject()获取。（如果获取到了就从singletonFactories中移除，并且放进earlySingletonObjects。
 4. 其实也就是从三级缓存移动（是剪切、不是复制哦~）到了二级缓存）
-   
 
 #### 为啥构造器造成的循环依赖spring无法解决？
 

@@ -1,8 +1,43 @@
 ## 注解
 
+- spring相关注解、springCloud相关注解、dubbo相关注解
+
+```
+@FeignClient 一般关注name、value、url 、configuration、rollback
+```
+
+
+
+- mybatis、JPA、mongo、ES等数据库相关注解
+
+- 配置文件相关注解，如：
+
+```
+@ConditionalOnProperty 读取特定前缀的配置文件的注解
+@Value
+@RefreshScope　如果代码中需要动态刷新配置，在需要的类上加上该注解就行
+```
+
+- MQ 相关注解，如rocketMQ、Kafka相关的各种注解
+
+```
+@Consumer
+```
+
+- Hystrix、Sentinel相关注解
+
+```
+@SentinelResource
+@HystrixCommand
+```
+
+
+
 ### spring常用注解
 
 ```java
+@Bean 用在方法上，告诉Spring容器，你可以从下面这个方法中拿到一个Bean
+
 @Configuration把一个类作为一个IoC容器，它的某个方法头上如果注册了@Bean，就会作为这个Spring容器中的Bean。
 
 @Scope注解 作用域
@@ -34,6 +69,19 @@
 @PostConstruct 初始化注解
 
 @PreDestroy 摧毁注解 默认 单例 启动就加载
+```
+
+#### 其它使用比较多的注解
+
+```
+@ConditionalOnProperty 读取特定前缀的配置文件的注解
+@Consumer 消费者注解
+@Value注解，注入配置文件字段
+@FeignClient注解
+
+@EnableHystrix 支持Hystrix
+@HystrixCommand 方法级别的配置
+@RefreshScope　如果代码中需要动态刷新配置，在需要的类上加上该注解就行
 ```
 
 
