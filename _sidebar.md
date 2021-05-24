@@ -69,6 +69,7 @@
 * 服务高可用
   - [限流](./docs/秒杀相关/限流/限流.md)
   - [Hystrix与Sentinel](./docs/优秀开源框架/Hystrix与sentinel/熔断限流.md)
+  - [分布式事务](./docs/优秀开源框架/seata/分布式事务.md)
 * [常用英文词汇](./docs/常用英文词汇.md)
 * 中间件
   - [ZK、CAP、ZAB](./docs/springCloud和dubbo/cap.md)
