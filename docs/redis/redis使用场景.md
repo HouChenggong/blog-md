@@ -26,11 +26,28 @@
 - 文件事件分派器
 - 事件处理器（连接应答处理器、命令请求处理器、命令回复处理器）
 
-### redis数据结构
+![](./img/redis线程模型.png)
 
-### string 
 
-- Set  a. b 其实创建了两个SDS，那么什么是SDS？
+
+Redis 的线程模型就是典型的单reactor 单线程模型；
+
+Redis 因为是从内存读取数据，所以任务耗时非常短，同时能减少线程切换带来损耗，这种线程模型，还能保证指令的顺序执行。
+
+#### redis选中的是select还是epoll?
+
+Redis的I/O多路复用程序的所有功能是通过包装select、epoll、evport和kqueue这些I/O多路复用函数库来实现的，每个I/O多路复用函数库在Redis源码中都对应一个单独的文件，比如ae_select.c、ae_epoll.c、ae_kqueue.c等。
+
+因为Redis为每个I/O多路复用函数库都实现了相同的API，所以I/O多路复用程序的底层实现是可以互换的.
+Redis在I/O多路复用程序的实现源码中用#include宏定义了相应的规则，程序会在编译时自动选择系统中性能最好的I/O多路复用函数库来作为Redis的I/O多路复用程序的底层实现
+
+
+
+## redis数据结构
+
+### SDS动态字符串
+
+- 采用SDS的形式存储
 
 ```c++
 struct sdshdr{
@@ -42,7 +59,7 @@ struct sdshdr{
 
 - SDS的优点：
   - 计数直接用len O（1）的复杂度
-  - 杜绝缓冲区溢出，因为C语言拼接的时候，如果第一个字符串空间不足，会导致缓冲区溢出，而red is拼接的时候先会去检查是否剩余的空间足够，不够则先扩展空间
+  - 杜绝缓冲区溢出，因为C语言拼接的时候，如果第一个字符串空间不足，会导致缓冲区溢出，而redis拼接的时候先会去检查是否剩余的空间足够，不够则先扩展空间
   - 减少字符串分配内存次数
     - 通过空间预分配，也就是free的意义，记录当前预分配多少内存
     - 分配策略：
@@ -65,9 +82,193 @@ string hash list set zset(有序)
 
 HyperLogLog Pub/Sub BloomFilter
 
+### linkedList链表
+
+redis的链表结构
+
+```c
+typedef struct list {
+  // 表头结点
+  listNode *head;
+  // 表尾节点
+  listNode *tail;
+  // 链表所包含的节点数量
+  unsigned long len;
+  // 其他函数
+  ...
+}list;
+
+```
+
+链表的每个节点结构
+
+```c
+typedef struct listNode{
+  // 前置节点
+  struct listNode *prev;
+  // 后置节点
+  struct listNode *next;
+  // 节点的值
+  void *value;
+}listNode
+
+```
+
+最终效果如图：
+
+![](./img/linkedlist.png)
+
+特点：双向链表、无环，带有头节点和尾节点、直接能获取长度
+
+### ziplist压缩链表
+
+`zsetkey 和hash`的 zset 内部使用的编码方法其中之一就是 **ziplist**.
+
+为啥说之一，因为当有序集合或哈希的元素数目比较少，且元素都是短字符串时，Redis才使用压缩列表作为其底层数据存储方式
+
+```c
+> zadd zsetkey 1.0 a 2.0 b 3.0 c
+3
+> debug object zsetkey
+Value at:0x7fb585166d40 refcount:1 encoding:ziplist serializedlength:36 lru:11299423 lru_seconds_idle:8
+> hmset person name zhangsan gender 1 age 22
+OK
+> object encoding person
+ziplist   
+```
+
+ziplist的结构
+
+```java
+struct ziplist<T>{
+    // 整个压缩列表占用字节数
+    int32 zlbytes;
+    // 最后一个节点到压缩列表起始位置的偏移量，可以用来快速的定位到压缩列表中的最后一个元素
+    int32 zltail_offset;
+    // 压缩列表包含的元素个数
+    int16 zllength;
+    // 元素内容列表，用数组存储，内存上紧挨着
+    T[] entries;
+    // 压缩列表的结束标志位，值永远为 0xFF.
+    int8 zlend;
+}
+
+```
+
+压缩列表的每一个节点的定义为：
+
+```c
+struct entry{
+    // 前一个 entry 的长度
+    int<var> prevlous_entry_length;
+    // 编码方式
+    int<vat> encoding;
+    // 内容
+    optional bute[] content;
+}
+
+```
+
+最终结构如图
+
+![](./img/压缩链表.png)
+
+
+
+#### ziplist存在的意义？
+
+- 列表数据结构，我们已经有了链表，为什么还需要重新搞一个压缩列表呢？**为了节省内存**
+  - 链表的前后指针是一个非常耗费内存的结构，因此在数据量小的时候，这一部分的空间尤其显得浪费。
+
+具体ziplist相关的请参考：https://segmentfault.com/a/1190000017328042
+
+#### ziplist如何遍历？
+
+1、从链表尾部遍历反向遍历，因为ziplist有一个尾部节点偏移量zltail_offset属性，我们就能拿到尾部节点
+
+2、拿到了尾部节点之后如何遍历其它节点
+
+3、有了尾部节点调用当前节点的`prevlous_entry_length`属性，就可以拿到前一个节点，然后不断向前遍历了。
+
+### quickList快速链表
+
+在 3.0 版本的 Redis 中，List 类型有两种实现方式：linkedList、ziplist
+
+在 3.2 版本后新增了 **quicklist** 数据结构实现了 list
+
+```c
+> rpush listkey go py java
+6
+> debug object listkey
+Value at:0x7fb58146b8a0 refcount:1 encoding:quicklist serializedlength:36 lru:11301577 lru_seconds_idle:8 ql_nodes:1 ql_avg_node:6.00 ql_ziplist_max:-2 ql_compressed:0 ql_uncompressed_size:34
+```
+
+不再阐述代码结构，只说明为啥要用quick List
+
+![](./img/QuickList.png)
+
+#### 为啥引入quickList?
+
+- LinkedList优缺点
+  - 双端链表便于在表的两端进行 push 和 pop 操作，但是它的内存开销比较大；
+  - 双端链表每个节点上除了要保存数据之外，还要额外保存两个指针；
+  - 双端链表的各个节点是单独的内存块，地址不连续，节点多了容易产生内存碎片；
+- ziplist优缺点
+  - ziplist 由于是一整块连续内存，所以存储效率很高；
+  - ziplist 不利于修改操作，每次数据变动都会引发一次内存的 重新分配内存空间realloc；
+  - 当 ziplist 长度很长的时候，一次 realloc 可能会导致大批量的数据拷贝，进一步降低性能；
+
+
+
+quicklist 是一个双向链表，并且是一个 ziplist 的双向链表，也就是说 quicklist 的每个节点都是一个 ziplist。而通过前面的文章咱们可以知道，ziplist 本身也是一个能维持数据项先后顺序的列表，而且数据项保存在一个连续的内存块中。意味着 quicklist 结合了压缩列表和双端链表的特点，是一个平衡了时间和空间的折中方案
+
+### IntSet整数集合
+
+- 当一个集合只包含整数元素且数量不多的时候就会用intset
+
+- 可以保存int16_、int32_、int64不同类型的整数，并且保证不重复
+
+```java
+> sadd numbers 1 2 3 4 5
+5
+> debug object numbers
+Value at:0x7f3e7eedf380 refcount:1 encoding:intset serializedlength:19 lru:11301716 lru_seconds_idle:15
+```
+
+结构如下：
+
+```java
+//每个intset结构表示一个整数集合
+typedef struct intset{
+    //编码方式
+    uint32_t encoding;
+    //集合中包含的元素数量
+    uint32_t length;
+    //保存元素的数组
+    int8_t contents[];
+} intset;
+```
+
+如下图就是存储int16的结构，按照从小到大排列
+
+![](./img/int16.png)
+
+#### inset升级
+
+如上图是存储一个int16的结构，如果来了一个int32结构的数字怎么办？
+
+1. 修改encoding为int32
+2. 扩展空间大小，为新的int32数字新建内存空间
+3. 把原来int16的数字格式全部转为int32,放入新的位置上，保持有序性
+4. 把新元素放到指定位置上
+
+但是intset不支持降级
+
+### Dict字典
+
 ### [过期时间](http://www.redis.cn/commands/expire.html)
 
-如果假设你设置了一批 key 只能存活1个小时，那么接下来1小时后，我们如何把该key删除呢？
+如果假设你设置了一批 key 只能存活1个小时，那么接下来1小时后，我们如何把该key删除呢
 
 方案一：我们首先想到为每个key都设置一个定时器，到了时间就把该key删除，但是这样为每一个都设置一个定时器，这种策略对内存很友好，但是对 `CPU` 不友好，因为每个定时器都会占用一定的 `CPU` 资源。
 
