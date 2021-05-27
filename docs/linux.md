@@ -199,4 +199,44 @@ jmap
 jstack
 ```
 
+#### jstack打印堆栈信息分析CPU
+
+
+
 - Top -h 
+
+```
+https://mp.weixin.qq.com/s/HvRJkzkKPzzvf0TozjaCcg
+```
+
+1. 接着用top -H -p pid来找到 CPU 使用率比较高的一些线程，比如pid=66
+
+```java
+top -H -p pid
+```
+
+2. 然后将占用最高的 pid 转换为 16 进制printf '%x\n' pid得到 nid,比如是：42
+
+```java
+printf '%x\n' 66
+```
+
+3. 接着直接在 jstack 中找到相应的堆栈信息jstack pid |grep 'nid' -C5 –color
+
+```
+jstack pid |grep '0x42' -C5 –color
+```
+
+可以看到我们已经找到了 nid 为 0x42 的堆栈信息
+
+
+
+[线上问题](https://mp.weixin.qq.com/s/Lyca7d1WYOi3eegIAI2WRQ)
+
+#### JMAP 定位代码内存泄漏
+
+如果是OOM相关的，则使用JMAPjmap -dump:format=b,file=filename pid来导出 dump 文件
+
+
+
+另一方面，我们可以在启动参数中指定-XX:+HeapDumpOnOutOfMemoryError来保存 OOM 时的 dump 文件。
