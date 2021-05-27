@@ -1,4 +1,4 @@
-
+[小米技术团队关于Synchronized的讲解](https://xiaomi-info.github.io/2020/03/24/synchronized/)
 
 ## JVM8大原子操作
 
