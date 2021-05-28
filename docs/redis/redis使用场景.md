@@ -28,6 +28,34 @@ Redis的事务功能较弱(不支持回滚)，而且集群版本(自研和官方
 - 1.所有key都应该由 KEYS 数组来传递，redis.call/pcall 里面调用的redis命令，key的位置，必须是KEYS array, 否则直接返回error，"-ERR bad lua script for redis cluster, all the keys that the script uses should be passed using the KEYS arrayrn"
 - 2.所有key，必须在1个slot上，否则直接返回error, "-ERR eval/evalsha command keys must in same slotrn"
 
+#### redis BigValue
+
+Redis使用过程中经常会有各种大key的情况， 比如：
+
+1. 单个简单的key存储的value很大
+2. hash， set，zset，list 中存储过多的元素（以万为单位）
+
+其实bigvalue有时候也不能避免，比如你要缓存一个用户的粉丝数，几万怎么办？
+
+- 带来的问题
+  - 阻塞请求：redis为单线程，单value较大读写需要较长的处理时间，会阻塞后续的请求处理；
+  - 阻塞网络：单value较大时会占用服务器网卡较多带宽，可能会影响该服务器上的其他Redis实例或者应用。
+  - 内存不均：单value较大时，可能会导致节点之间的内存使用不均匀，间接地影响key的部分和负载不均匀
+
+- 解决方案
+  - value大的问题：改为Hash型结构或者进行压缩算法
+  - Hash、set等数据过多：将元素拆分
+
+以Hash为例进行拆分
+
+```java
+newHashKey  =  hashKey + (hash(field) % 10000）;   
+hset(newHashKey, field, value) ;  
+hget(newHashKey, field)
+```
+
+如果是set、set、list同样可以采用拆分的思路扩容的思路，把一个变成多个
+
 ### redis 线程模型
 
 它采用 IO 多路复用机制同时监听多个 socket，会将 socket 产生的事件放入队列中排队，事件分派器每次从队列中取出一个事件，把该事件交给对应的事件处理器进行处理。
@@ -471,6 +499,7 @@ Redis渐近式hash过程如下：
   - 比如100条数据，加一层50个，再加一层10个，再加一层3个，最终效果就是Olog(n)
   - 达到一种类似二分效果的目的
 - 跳跃表以空间换时间的方式提升了查找速度
+- 最低层包含所有的元素；
 - Redis有序集合在节点元素较大或者元素数量较多时使用跳跃表实现
 - Redis的跳跃表实现由 zskiplist和 zskiplistnode两个结构组成,其中 zskiplist用于保存跳跃表信息(比如表头节点、表尾节点、长度),而zskiplistnode则用于表示跳跃表节点
 - Redis每个跳跃表节点的层高都是1至32之间的随机数
@@ -486,7 +515,13 @@ Redis渐近式hash过程如下：
 | Zset     | ziplist 或者 `skiplist`, skiplist 编码中使用了跳跃表+字典 |
 | hash     | ziplist 或者 hashtable                                    |
 
+#### redis zset为啥不用java的红黑树？
 
+首先redis zset使用了两种数据结构，在数据量比较小的时候使用ziplist，数据量大的时候使用的是跳表skiplist
+
+跳表和红黑树共同点：两者插入删除，删除，查找以及迭代输出时间复杂度红黑树和跳表的时间复杂度是一样的
+
+跳表相较于红黑树的优点：在跳表中，要查找区间的元素，我们只要定位到两个区间端点在最低层级的位置，然后按顺序遍历元素就可以了，非常高效。而红黑树只能定位到端点后，再从首位置开始每次都要查找后继节点，相对来说是比较耗时的。
 
 ### [过期时间](http://www.redis.cn/commands/expire.html)
 
