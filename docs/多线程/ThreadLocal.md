@@ -480,3 +480,261 @@ public class ThreadLocalNPE {
 ### ThreadLocal传递不支持
 
 InheritableThreadLocal可以支持
+
+## ThreadLocal生产中的问题
+
+### ThreadLocal不支持线程传递
+
+```java
+public class ThreadLocalTest {
+    static ThreadLocal<String> threadLocal = new ThreadLocal<>();
+
+    public static void main(String[] args) {
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                ThreadLocalTest.threadLocal.set("猿天地");
+                new Service().call();
+
+            }
+        }).start();
+
+    }
+}
+
+
+class Service {
+    public void call() {
+        System.out.println("Service:" + Thread.currentThread().getName());
+        System.out.println("Service:" + ThreadLocalTest.threadLocal.get());
+        new Dao().call();
+        new Service2().call();
+    }
+}
+
+class Dao {
+    public void call() {
+        System.out.println("==========================");
+        System.out.println("Dao:" + Thread.currentThread().getName());
+        System.out.println("Dao:" + ThreadLocalTest.threadLocal.get());
+    }
+}
+
+class Service2 {
+    public void call() {
+        System.out.println("==========================");
+        System.out.println("Service2:" + Thread.currentThread().getName());
+        System.out.println("Service2:" + ThreadLocalTest.threadLocal.get());
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                System.out.println("Service2新线程:" + Thread.currentThread().getName());
+                System.out.println("Service2新线程:" + ThreadLocalTest.threadLocal.get());
+            }
+        }).start();
+    }
+}
+```
+
+- 结果如下：
+
+```java
+Service:Thread-0
+Service:猿天地
+==========================
+Dao:Thread-0
+Dao:猿天地
+==========================
+Service2:Thread-0
+Service2:猿天地
+Service2新线程:Thread-1
+Service2新线程:null
+```
+
+- 解决方案也很简单：直接替换为：InheritableThreadLocal
+
+```java
+static ThreadLocal<String> threadLocal = new InheritableThreadLocal<>();
+```
+
+
+
+### ThreadLocal在Feign开启Hystrix获取不到ThreadLocal的问题
+
+其实还是同一个问题，即ThreadLocal不支持线程间传递的问题
+
+为啥开启了Hystrix就不支持了，其实也不能这么说，如果开了Hystrix但是用的是信号量模式的话还是支持的，所以有2种解决方案
+
+方案一、该用Hystrix的信号量模式，但是信号量模式优缺点，具体可以参考Hystrix那一篇文章
+
+方案二：继续使用线程池模式，但是该用InheritableThreadLocal
+
+#### 方法异步执行后获取不到ThreadLocal的值
+
+比如一个方法用了@Async注解，就获取不到了，其实原理是：@Async用了线程池
+
+我们可以用线程池做一个测试：
+
+```java
+ public static void main(String[] args) {
+        ThreadLocal<String> threadLocal = new ThreadLocal<>();
+        threadLocal.set("1");
+        Runnable  runnable= ()->{
+            System.out.println(Thread.currentThread().getName()+"...."+threadLocal.get());
+        };
+
+        ThreadPoolExecutor executor = new java.util.concurrent.ThreadPoolExecutor(
+                1,
+                3,
+                20,
+                TimeUnit.SECONDS,
+                new ArrayBlockingQueue<>(10),
+                new ThreadPoolExecutor.CallerRunsPolicy());
+
+        executor.execute(runnable);
+        threadLocal.set("2");
+        executor.execute(runnable);
+    }
+//得到的结果都是null
+```
+
+
+
+## InheritableThreadLocal 原理
+
+- InheritableThreadLocal 继承自ThreadLocal，重写了其中crateMap方法和getMap方法。
+- 重写这两个方法的目的是使得所有线程通过InheritableThreadLocal设置的上下文信息，都保存在其对应的inheritableThreadLocals属性中
+
+```java
+public class InheritableThreadLocal<T> extends ThreadLocal<T> {
+ 
+    protected T childValue(T parentValue) {
+        return parentValue;
+    }
+    ThreadLocalMap getMap(Thread t) {
+       return t.inheritableThreadLocals;
+    }
+    void createMap(Thread t, T firstValue) {
+        t.inheritableThreadLocals = new ThreadLocalMap(this, firstValue);
+    }
+}
+```
+
+而原来ThreadLocal本来的方法是什么呢？可见其实就是用了两个不同的变量
+
+```java
+    ThreadLocalMap getMap(Thread t) {
+        return t.threadLocals;
+    }
+     void createMap(Thread t, T firstValue) {
+        t.threadLocals = new ThreadLocalMap(this, firstValue);
+    }
+```
+
+
+
+
+
+我们再看下inheritableThreadLocals的属性，它在Thread类种定义
+
+```java
+public class Thread implements Runnable {
+   ......(其他源码)
+    /* 
+     * 当前线程的ThreadLocalMap，主要存储该线程自身的ThreadLocal
+     */
+    ThreadLocal.ThreadLocalMap threadLocals = null;
+
+    /*
+     * InheritableThreadLocal，自父线程集成而来的ThreadLocalMap，
+     * 主要用于父子线程间ThreadLocal变量的传递
+     * 本文主要讨论的就是这个ThreadLocalMap
+     */
+    ThreadLocal.ThreadLocalMap inheritableThreadLocals = null;
+    ......(其他源码)
+}
+```
+
+#### inheritableThreadLocals是如何传递的呢？
+
+1. 从用户创建一个线程开始
+
+```java
+Thread thread = new Thread();
+```
+
+```java
+    public Thread() {
+        init(null, null, "Thread-" + nextThreadNum(), 0);
+    }
+
+    private void init(ThreadGroup g, Runnable target, String name,
+                      long stackSize) {
+        init(g, target, name, stackSize, null, true);
+    }
+```
+
+2. 我们具体看下init方法
+
+```java
+    /**
+     * 初始化一个线程.
+     * 此函数有两处调用，
+     * 1、上面的 init()，不传AccessControlContext，inheritThreadLocals=true
+     * 2、传递AccessControlContext，inheritThreadLocals=false
+     */
+    private void init(ThreadGroup g, Runnable target, String name,
+                      long stackSize, AccessControlContext acc,
+                      boolean inheritThreadLocals) {
+        ......（其他代码）
+
+        if (inheritThreadLocals && parent.inheritableThreadLocals != null)
+            this.inheritableThreadLocals =
+                ThreadLocal.createInheritedMap(parent.inheritableThreadLocals);
+
+        ......（其他代码）
+    }
+```
+
+可以看到，采用默认方式产生子线程时，inheritThreadLocals=true；若此时父线程inheritableThreadLocals不为空，则将父线程inheritableThreadLocals传递至子线程。
+
+#### inheritableThreadLocals线程池下无效问题
+
+```java
+public static void main(String[] args) {
+        ThreadLocal<String> threadLocal = new InheritableThreadLocal<>();
+        threadLocal.set("1");
+        Runnable  runnable= ()->{
+            System.out.println(Thread.currentThread().getName()+"...."+threadLocal.get());
+        };
+
+        ThreadPoolExecutor executor = new java.util.concurrent.ThreadPoolExecutor(
+                2,
+                3,
+                20,
+                TimeUnit.SECONDS,
+                new ArrayBlockingQueue<>(10),
+                new ThreadPoolExecutor.CallerRunsPolicy());
+
+        executor.execute(runnable);
+        threadLocal.set("2");
+        executor.execute(runnable);
+        threadLocal.set("3");
+        executor.execute(runnable);
+    }
+```
+
+```java
+pool-1-thread-1....1
+pool-1-thread-2....2
+pool-1-thread-2....2
+  //第三个线程由于复用了前一个线程，导致还是原来的ThreadLocal的值
+```
+
+
+
+线程池中线程是复用的，池中线程的会一直保存着创建线程时继承来的值
+
+1、InheritableThreadLocal在线程池下是无效的，原因是只有在创建Thread时才会去复制父线程存放在InheritableThreadLocal中的值，而线程池场景下，主业务线程仅仅是将提交任务到任务队列中。
+
+ 2、如果需要解决这个问题，可以自定义一个RunTask类，使用反射加代理的方式来实现业务主线程存放在InheritableThreadLocal中值的间接复制。可以参考：[代理反射](https://www.jianshu.com/p/29f4034f4250)
