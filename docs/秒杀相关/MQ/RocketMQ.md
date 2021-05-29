@@ -483,7 +483,6 @@ final` `long` `offset = msgs.get(``0``).getQueueOffset();``final` `String maxOff
 - 客户端保证
   - 重试机制，无论是同步还是异步发送，如果单个Broker发生故障，重试会选择其它的Broker保证消息正常发送
   - 保证机制，客户端容错，MQ会维护一个Broker——发送延迟的关系，利用这个关系，我们可以选择一个发送延迟级别较低的Broker来发送新消息
-  
 #### Broker高可用
   - 要绝对高可用可以同步复制、同步刷盘
   - 大部分场景可以异步复制、异步刷盘
@@ -1067,4 +1066,53 @@ public MessageQueue selectOneMessageQueue(final String lastBrokerName) {
 - 为了排查问题，有的时候业务需要一定的单个消息查询能力。
   - rocketMQ提供了按照消息ID、消息key、topic三种查询的方式
   - 另外找到了之后也可以进行回溯消费
+
+#### 消息是如何在RocketMQ中存储的？
+
+- CommitLog只有一个文件，只是为了保存和读写被分为多个子文件，所有子文件通过保存第一个和最后一个的物理位点进行连接
+- Broker按照时间和物理的offset顺序写CommitLog，每次写的时候加锁
+- 每个子文件默认1G
+
+- 为啥写入的时候那么快？其实RocketMQ是借鉴Kakfa的设计
+
+  - PageCache：每个Page默认4K，因为程序一般满足局部性原理，所以程序读的时候一般会把一段文件读到pageCache中，这样如果命中PageCache就不用读磁盘了
+  - PageCache的缺点：遇到脏页回写、内存回收、内存交换等会带来较大延迟
+  - 零拷贝技术：比如读的时候会经历2次拷贝
+  - 虚拟内存技术
+  - 读写分离机制：从Master写，从slave读
+
+  
+
+#### 索引机制
+
+Rocket MQ存在两种索引机制：CommitLog和ConsumerQueue
+
+- ConsumerQueue
+  - 消费队列索引：主要用于拉取消息、更新消费位点的索引
+  
+  - 结构是：offset、消息体大小、Tag的hash值
+  
+- CommitLog索引机制
+
+    - Roctet MQ存在多个IndexFile文件，按照消息产生的时间顺序排列
+    - 每个IndexFile的结构是：文件头、hash槽、索引数据
+    - hash槽的设计类似Java的hashmap只是不同的是只有链表没有红黑树
+    - hash碰撞的时候，hash槽中保存的是最新的消息指针，因为用户一般关系的就是最新的数据
+    - 链表中每个Entry结构是：消息key的hash值、消息的offset、时间差、链表下一个指针
+    
+    
+    
+    
+#### 索引如何使用
+
+- 基于位点查询消息
+    - RocketMQ支持push和pull两种模式，push是基于poll实现的
+    - push和poll都是基于拉去消息进行消费和提交位点的
+    - 如果是基于位点的查询，过程就是取Consumer Queue中读取消息的位点，消息体大小和Tag的hash值。首先先根据TAG的hash值过滤，然后根据offset定位CommitLog
+- 基于时间段查询
+    - 还是借助ConsumerQueue索引查询，因为ConsumerQueue是按照时间顺序写的
+- 按照key查询
+    - 直接去CommitLog先定位hash槽、然后根据offset查询
+
+
 
