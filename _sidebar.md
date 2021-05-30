@@ -58,6 +58,7 @@
   * [测试事务的传播行为](./docs/springboot/测试事务传播行为.md)
 * [MySql]
   * [mysql基础](./docs/mysql/mysql系列.md)
+  * [mysql锁的理解](./docs/mysql/锁.md)
   * [mysql一些问题](./docs/mysql/btree.md)
 * 分布式
   - [redis基础](./docs/redis/redis使用场景.md)
