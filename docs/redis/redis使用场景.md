@@ -427,6 +427,15 @@ Redis渐近式hash过程如下：
 - 在 rehash 期间，每次对 字典进行 增删改查操作，在完成实际操作之后，都会进行 一次 rehash 操作，将 ht[0] 在`rehashindex` 位置上的值 rehash 到 ht[1] 上。将 rehashindex 递增一位。
 - 随着不断的执行，原来的 ht[0] 上的数值总会全部 rehash 完成，此时结束 rehash 过程。 将 rehashindex 置为-1.
 
+总结下：
+
+- 如果是新增元素，会直接操作ht[1]，保证ht[0]的数据只减不增。
+- 如果dict.rehashidx值为-1，则当前没有rehash操作，直接操作ht[0]。
+- 如果dict.rehashidx值大于等于0，则表示正在进行rehash操作。
+- 将计算的ht[0]中的索引与dict.rehashidx比较，如果索引大于dict.rehashidx，表示索引还未rehash，直接操作ht[0]。
+- 如果索引不大于dict.rehashidx，则表示索引已经rehash到ht[1]。根据ht[1]重新计算索引，根据索引操作ht[1]
+- 结束。
+
 在上面的过程中有两个问题没有提到：
 
 **假如这个服务器很空余呢？中间几小时都没有请求进来，那么同时保持两个 table, 岂不是很浪费内存？**

@@ -600,7 +600,9 @@ static ThreadLocal<String> threadLocal = new InheritableThreadLocal<>();
 
 
 
-## InheritableThreadLocal 原理
+## InheritableThreadLocal  ITL原理
+
+Inheritable： 可继承的
 
 - InheritableThreadLocal 继承自ThreadLocal，重写了其中crateMap方法和getMap方法。
 - 重写这两个方法的目的是使得所有线程通过InheritableThreadLocal设置的上下文信息，都保存在其对应的inheritableThreadLocals属性中
@@ -738,3 +740,26 @@ pool-1-thread-2....2
 1、InheritableThreadLocal在线程池下是无效的，原因是只有在创建Thread时才会去复制父线程存放在InheritableThreadLocal中的值，而线程池场景下，主业务线程仅仅是将提交任务到任务队列中。
 
  2、如果需要解决这个问题，可以自定义一个RunTask类，使用反射加代理的方式来实现业务主线程存放在InheritableThreadLocal中值的间接复制。可以参考：[代理反射](https://www.jianshu.com/p/29f4034f4250)
+
+
+
+###  TransmittableThreadLocal TTL
+
+Transmittable 可传输的ThreadLocal
+
+官网：[TTL官网](https://github.com/alibaba/transmittable-thread-local)
+
+TTL：解决了什么问题？线程池下不支持传递的问题
+
+TTL：应用场景:Hystrix、链路追踪技术
+
+TTL原理：从InheritableThreadLocal不支持线程池的根本原因是InheritableThreadLocal是在父线程创建子线程时复制的，由于线程池的复用机制，“子线程”只会复制一次。要支持线程池中能访问提交任务线程的本地变量，其实只需要在父线程向线程池提交任务时复制父线程的上下环境，那在子线程中就能够如愿访问到父线程中的本地变量，实现本地环境变量在线程池调用中的透传，从而为实现链路跟踪打下坚实的基础，这也就是TransmittableThreadLocal最本质的实现原理。 
+
+TTL做的实际上就是将原本与Thread绑定的线程变量，缓存一份到TtlRunnable对象中，在执行子线程任务前，将对象中缓存的变量值设置到子线程的ThreadLocal中以供run()方法的代码使用，然后执行完后，又恢复现场，保证不会对复用线程产生影响。
+
+
+
+TransmittableThreadLocal继承自InheritableThreadLocal，但是要真正使用TTL还要配合使用它的TTL线程池，参考：[TTL 原理理解](https://www.cnblogs.com/hama1993/p/10409740.html)
+
+ 
+ 
