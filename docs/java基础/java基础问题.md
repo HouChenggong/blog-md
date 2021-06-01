@@ -61,6 +61,9 @@ class PersonPlayServiceImpl implements PlayService{
 ### 构造函数能否被重写？重载？
 不能被重写，可以被重载，也就是为什么有那么多构造函数的原因，都是重载的
 
+- 为啥Java不支持多重继承？
+  - 比如A继承了BCD，如果BCD有相同的方法，则A不知道要调用哪个
+
 
 ## Object类
 

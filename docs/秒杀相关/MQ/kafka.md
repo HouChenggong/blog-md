@@ -63,6 +63,19 @@ Producer将数据发送到Broker，PageCache会缓存这部分数据。当所有
 
 ### RocketMQ与KafKa区别
 
-  KafKa每个partion都单独存放，而RocketMQ同一个Broker中所有的队列的数据都存放在一个CommitLog中，KafKa这种方式一旦 Topic 的 Partition 数量过多，
+-  KafKa每个partion都单独存放，而RocketMQ同一个Broker中所有的队列的数据都存放在一个CommitLog中，KafKa这种方式一旦 Topic 的 Partition 数量过多，
 
 队列文件会过多，那么会给磁盘的 IO 读写造成比较大的压力，也就造成了性能瓶颈。所以 RocketMQ 进行了优化，消息主题统一存储在 CommitLog 中。
+
+- 速度的话：Kafka是百万级别并发、RocketMQ是十万级别
+- 注册中心：Kafka是zookeeper、RocketMQ是NameServer
+- kafka都是异步刷盘，但是有三种方式
+  - 0-生产者不等待broker的ack，继续发送消息 
+  - 1- 等待leader落盘返回
+  -  -1-主从全部落盘才返回ack
+- RocketMQ支持延迟消息，Kafka不支持
+- RocketMQ支持Push和pull两种模式，Kafka只有一种poll
+  - 但是RocketMQ的push模式是基于pull和长轮询做的
+  - 当consumer过来请求时，broker会保持当前连接一段时间 默认15s,如果这段时间内有消息到达，则立刻返回给consumer；15s没消息的话则返回空然后重新请求。这种方式的缺点就是服务端要保存consumer状态，客户端过多会一直占用资源。
+- Kafka不支持分布式事务，RocketMQ支持
+
