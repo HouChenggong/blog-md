@@ -498,9 +498,9 @@ Broadcast Cluster
   - 反之，Dubbo 缺省协议不适合传送大数据量的服务，比如传文件，传视频等，除非请求量很低。
   - 连接个数：单连接
   - 连接方式：长连接
-  - 传输协议：t c p
+  - 传输协议：tcp
   - 传输方式：NIO异步传输
-  - 序列化H essian二进制序列化
+  - 序列化Hessian二进制序列化
   - 适用场景：常规远程服务方法调用
   - **约束：参数及返回值需实现 `Serializable` 接口**
     - 还有很多注意的地方：比如
@@ -514,7 +514,18 @@ Broadcast Cluster
     - 因为真正的服务提供者其实很少，就几台机器，但是消费者众多，单一长连接可以减少握手验证，并使用异步IO复用线程池
 - rmi://
 - hessian://
+  - Hessian 底层采用 Http 通讯
+  - 连接个数：多连接
+  - 连接方式：短连接
+  - 传输协议：HTTP
+  - 传输方式：同步传输
+  - 序列化：Hessian二进制序列化
+  - 适用范围：传入传出参数数据包较大，提供者比消费者个数多，提供者压力较大，可传文件。
+  - 适用场景：页面传输，文件传输，或与原生hessian服务互操作
+  - 约束：参数和返回值都要实现序列化Serializable接口
+  - 约束2:参数及返回值不能自定义实现 `List`, `Map`, `Number`, `Date`, `Calendar` 等接口，只能用 JDK 自带的实现，因为 hessian 会做特殊处理，自定义实现类中的属性值都会丢失
 - http://
+  - 走JSON序列化
 - webservice://
 - thrift://
 - memcached://
@@ -575,5 +586,86 @@ cpu个数 + 1
 
 zookeeper临时节点，会话保持原理。
 
+### hession 数据结构
 
+- Hessian 的对象序列化机制有 8 种原始类型：
+
+• 原始二进制数据
+• boolean
+• 64-bit date（64 位毫秒值的日期）
+• 64-bit double
+• 32-bit int
+• 64-bit long
+• null
+• UTF-8 编码的 string
+
+- 另外还包括 3 种递归类型：
+  • list for lists and arrays
+  • map for maps and dictionaries
+  • object for objects
+- 还有一种特殊的类型：
+  • ref：用来表示对共享对象的引用。
+
+
+
+
+
+- 为什么PB的效率是最高的？
+  可能一些同学比较习惯于 JSON 或 XML 数据存储格式，对于 Protocol Buffer 还比较陌生。Protocol Buffer 其实是 Google 出品的一种轻量并且高效的结构化数据存储格式，性能比 JSON，XML要高很多。
+
+- 其实PB之所以性能如此好，主要得益于两个原因：
+  - 1、它使用 Proto 编译器，自动进行序列化和反序列化，速度非常快，应该比 XML 和JSON 快上了 20-100倍。
+  - 2、它的数据压缩效果好，就是说它序列化后的数据量体积小。因为体积小，传输起来带宽和速度上会有优化。
+
+### dubbo动态代理策略
+
+默认使用 javassist 动态字节码生成，创建代理类。但是可以通过 spi 扩展机制配置自己的动态代理策略。
+
+### dubbo SPI
+
+说dubbo SPI之前先说下SPI是什么（service provider Interface)参考：[SPI](https://blog.csdn.net/qq_35190492/article/details/108256452)
+
+ Dubbo 并没有用 Java 实现的 SPI，而是自定义 SPI
+
+#### Java SPI
+
+就是约定一个目录，根据接口名去那个目录找到文件，文件解析得到实现类的全限定名，然后循环加载实现类和创建其实例。
+
+通过文件里填写的全限定名加载类，并且创建其实例放入缓存之后返回实例
+
+- 缺点：
+
+Java SPI 在查找扩展实现类的时候遍历 SPI 的配置文件并且**将实现类全部实例化**，假设一个实现类初始化过程比较消耗资源且耗时，但是你的代码里面又用不上它，这就产生了资源的浪费
+
+- 文件结构
+  - 文件名是接口全限定名称，比如com.xxx.UserService
+  - 文件内容是：几个具体的接口全路径：如：com.xxx.UserServiceV1Impl、com.xxx.UserServiceV2Imp
+
+#### dubbo SPI
+
+因此 Dubbo 就自己实现了一个 SPI，让我们想一下按需加载的话首先你得给个名字，通过名字去文件里面找到对应的实现类全限定名然后加载实例化即可。
+
+- 文件结构
+
+  - 文件名是接口全限定名称，比如com.xxx.UserService
+
+  - 文件内容是：
+
+    FailOver:com.xxx.FailOverCluster
+
+    FailFast:com.xxx.FailFastCluster
+
+#### dubbo 自适应扩展机制
+
+我们先来看一个场景，首先我们根据配置来进行 SPI 扩展的加载，但是我不想在启动的时候让扩展被加载，我想根据请求时候的参数来动态选择对应的扩展。
+
+#### 
+
+**Dubbo 通过一个代理机制实现了自适应扩展**，简单的说就是为你想扩展的接口生成一个代理类，可以通过JDK 或者 javassist 编译你生成的代理类代码，然后通过反射创建实例。
+
+
+
+@Adaptive这个注解就是自适应扩展相关的注解，可以修饰类和方法上，在修饰类的时候不会生成代理类，因为这个类就是代理类，修饰在方法上的时候会生成代理类。
+
+[Dubbo 对IOC和AOP的增强](https://blog.csdn.net/qq_45076180/article/details/113976475)
 
