@@ -1,10 +1,16 @@
 ## 零拷贝
 
+### 用户和内核空间
+
 操作系统的核心是内核，独立于普通的应用程序，可以访问受保护的内存空间，也有访问底层硬件设备的权限。
 
 为了避免用户进程直接操作内核，保证内核安全，操作系统将虚拟内存划分为两部分，一部分是内核空间（Kernel-space），一部分是用户空间（User-space）。
 
-#### 传统读写
+
+
+进程从用户态切换到内核态时，需要保存用户态时的上下文信息，比如：用户程序基地址，程序计数器、cpu cache、寄存器。。。方便程序从内核态切换回用户态时恢复现场。
+
+### 传统读写
 
 参考：[零拷贝与Kafka](https://mp.weixin.qq.com/s/dbnpPEF0FBB5A5xH21OoeQ)
 
@@ -24,6 +30,22 @@ file.flush()
 3. 接着用户程序将用户态 Buffer 再拷贝到内核态（CPU copy）
 4. 最后通过 DMA copy 将数据拷贝到磁盘文件
 
+
+
+### DMA
+
+Direct Memory Access
+
+#### DMA产生的背景
+
+没有DMA时候怎么办：CPU读**内存**数据到**CPU的高速缓存**，再写到网卡。这样就把CPU的速度拉低到和网卡一个速度。
+
+有了DMA：把内存数据读到socket内核缓存区（CPU复制），CPU就不管了，告诉DMA开始接管。DMA开始把内核缓冲区的数据写到网卡。DMA读socket缓冲区，读到DMA缓冲区，然后写到网卡中。不停写到网卡。
+
+程序开发中常常需要将内存中的数据从地址A拷贝到地址B，虽说 CPU 访问内存的速度非常快，但是拷贝总归是要消耗 CPU 时间的。如果需要拷贝的数据比较长，那么拷贝动作将会消耗相当多的 CPU 时间，在此期间，CPU 不能做任何别的事情。
+
+粗略来看，数据的拷贝过程并不复杂，无非就是寻址+写入数据，CPU 把时间花在处理这样的“简单重复劳动”上就太浪费了，因此，DMA 就被设计出来了。
+
 ### 零拷贝的几种方式
 
 #### 直接I/O
@@ -34,28 +56,54 @@ file.flush()
 
 当应用程序不需要对数据进行访问时，则可以避免将数据从内核空间拷贝到用户空间
 
-#### copy on write
-
-写时拷贝技术，数据不需要提前拷贝，而是当需要修改的时候再进行部分拷贝
-
 - mmap
 - sendFile
 - sockmap
 - Splice && tee
 
+#### copy on write
+
+写时拷贝技术，数据不需要提前拷贝，而是当需要修改的时候再进行部分拷贝
 
 
-### Kafka与mmap
 
-- 网络数据持久化到磁盘 (Producer 到 Broker)
+### mmap
 
-传统模式下，数据从网络传输到文件需要 4 次数据拷贝、4 次上下文切换和两次系统调用。
+用户空间和内核空间共享同一块物理地址，这样就无需进程用户空间和内核空间的来回复制
+
+![](./img/mmap.png)
 
 **Memory Mapped Files**：简称 mmap，也有叫 **MMFile** 的，使用 mmap 的目的是将内核中读缓冲区（read buffer）的地址与用户空间的缓冲区（user buffer）进行映射。从而实现内核缓冲区与应用程序内存的共享，省去了将数据从内核读缓冲区（read buffer）拷贝到用户缓冲区（user buffer）的过程。它的工作原理是直接利用操作系统的 Page 来实现文件到物理内存的直接映射。完成映射之后你对物理内存的操作会被同步到硬盘上。
 
 使用这种方式可以获取很大的 I/O 提升，省去了用户空间到内核空间复制的开销。
 
-mmap 也有一个很明显的缺陷——不可靠，写到 mmap 中的数据并没有被真正的写到硬盘，操作系统会在程序主动调用 flush 的时候才把数据真正的写到硬盘。Kafka 提供了一个参数——`producer.type` 来控制是不是主动flush；如果 Kafka 写入到 mmap 之后就立即 flush 然后再返回 Producer 叫同步(sync)；写入 mmap 之后立即返回 Producer 不调用 flush 就叫异步(async)，默认是 sync。
+#### mmap缺陷
+
+mmap 也有一个很明显的缺陷——不可靠，写到 mmap 中的数据并没有被真正的写到硬盘，操作系统会在程序主动调用 flush 的时候才把数据真正的写到硬盘。
+
+Kafka 提供了一个参数——`producer.type` 来控制是不是主动flush；如果 Kafka 写入到 mmap 之后就立即 flush 然后再返回 Producer 叫同步(sync)；写入 mmap 之后立即返回 Producer 不调用 flush 就叫异步(async)，默认是 sync。
+
+
+
+### sendFile
+
+- sendFile传输文件描述符
+
+对于文件缓存区和socket缓冲区都是内核的地址，所以没有必要再经过应用缓存区，而对于文件其实就是对应的文件描述符，只需要把文件描述符传过去即可，所以最终SendFile只有2次拷贝
+
+![](./img/sendFile.png)
+
+Linux 2.4+ 内核通过 sendfile 系统调用，提供了零拷贝。数据通过 DMA 拷贝到内核态 Buffer 后，直接通过 DMA 拷贝到 NIC Buffer，无需 CPU 拷贝。这也是零拷贝这一说法的来源。除了减少数据拷贝外，因为整个读文件 - 网络发送由一个 sendfile 调用完成，整个过程只有两次上下文切换，因此大大提高了性能。
+
+
+
+现在要从文件进入到网络协议栈，只需 2 次拷贝：第一次使用 DMA 引擎从文件拷贝到内核缓冲区，第二次从内核缓冲区将数据拷贝到网络协议栈；内核缓存区只会拷贝一些 offset 和 length 信息到 SocketBuffer，基本无消耗。
+
+
+
+### Kafka与mmap
+
+- 网络数据持久化到磁盘 (Producer 到 Broker)用的是mmap
 
 ### Kakfa与sendFile
 
@@ -74,13 +122,55 @@ Socket.send(buffer)
 3. 接着用户程序通过 Socket 发送数据时将用户态 Buffer 数据拷贝到内核态 Buffer（CPU 拷贝）
 4. 最后通过 DMA 拷贝将数据拷贝到 NIC Buffer
 
-
-
-Linux 2.4+ 内核通过 sendfile 系统调用，提供了零拷贝。数据通过 DMA 拷贝到内核态 Buffer 后，直接通过 DMA 拷贝到 NIC Buffer，无需 CPU 拷贝。这也是零拷贝这一说法的来源。除了减少数据拷贝外，因为整个读文件 - 网络发送由一个 sendfile 调用完成，整个过程只有两次上下文切换，因此大大提高了性能。
-
-
-
 Kafka 在这里采用的方案是通过 NIO 的 `transferTo/transferFrom` 调用操作系统的 sendfile 实现零拷贝。总共发生 2 次内核数据拷贝、2 次上下文切换和一次系统调用，消除了 CPU 数据拷贝
+
+### rocketMQ为啥不用sendFile
+
+- sendFile更适合做大文件传输，而Kakfa在传输的时候会对数据批处理，所以更适合
+- rocketMQ使用Java写的，Kafka是Scala写的，Java在大对象会对垃圾回收产生一定影响，所以用了mmap
+
+### 堆外内存
+
+JVM启动时分配的内存，称为堆内存，与之相对的，在代码中还可以使用堆外内存，比如Netty，广泛使用了堆外内存，但是这部分的内存并不归JVM管理，GC算法并不会对它们进行回收，所以在使用堆外内存时，要格外小心，防止内存一直得不到释放，造成线上故障。
+
+JDK的ByteBuffer类提供了一个接口allocateDirect(int capacity)进行堆外内存的申请，底层通过unsafe.allocateMemory(size)实现
+
+最底层是通过malloc方法申请的，但是这块内存需要进行手动释放，JVM并不会进行回收，幸好Unsafe提供了另一个接口freeMemory可以对申请的堆外内存进行释放。
+
+#### NIO与堆外内存
+
+NIO：buffer数组，NIO把byte数组的位置和长度发给内核态，内核空间可以访问用户空间，这叫跨传输。如果发送GC，stw，线程都停止，会回收垃圾对象，会进行碎片整理，所以位置会变。NIO选择在堆外创建一个同样大小的buffer，先从用户空间拷贝到堆外空间（cpu拷贝），再发送write系统调用，这时候发送堆外的位置+长度，堆外是不发生GC的，然后再拷贝到内核缓冲区。NIO合理使用堆外内存可以避免堆内到堆外的一次拷贝，可以直接放到堆外buffer。
+
+- 堆外内存在NIO中的作用就是传输buffer位置的时候不受GC影响
+
+#### 堆外内存回收机制
+
+合理使用堆外内存可以减少拷贝。但是堆外不受JVM管理，如何释放？JVM中根据可达性算法从根对象跟踪引用对象。JVM的栈里指向了一个堆内的对象，该堆内对象指向堆外内存，该堆内对象代理操作堆外内存。如果不可达了后，判断该代理对象成为垃圾，回收的时候会去释放堆外空间。
+
+
+
+directbytebuffer的构造方法 ，实例一个清理器Cleaner, cleaner 是一个虚引用，该清理器其实内包含一个runnable , 具体的清理工作就在runnable里进行了
+
+ 其实就是ReferenceHandler的run方法执行的时候判断，如果队列元素是 cleanner类型， 就执行 Cleaner的clean 方法
+
+
+
+### Netty零拷贝
+
+### 避免数据流经用户空间
+
+Netty在这一层对零拷贝实现就是`FileRegion`类的`transferTo()`方法，我们可以不提供buffer完成整个文件的发送，不再需要开辟buffer循环读写。
+
+### 直接使用堆外内存
+
+
+
+### 减少数据在用户空间的多次拷贝
+
+1. 使用 Netty 提供的 `CompositeByteBuf` 类, 可以将多个`ByteBuf` 合并为一个逻辑上的 `ByteBuf`, 避免了各个 `ByteBuf` 之间的拷贝。
+2. `ByteBuf` 支持 slice 操作, 因此可以将 ByteBuf 分解为多个共享同一个存储区域的 `ByteBuf`, 避免了内存的拷贝
+
+
 
 ## Kafka
 ### Kafka zookeeper
