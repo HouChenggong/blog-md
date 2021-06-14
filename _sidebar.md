@@ -38,7 +38,6 @@
 * 多线程
   
   * [多线程基础](./docs/多线程/多线程基础.md)
-  * [生产者消费者模型](./docs/多线程/生产者消费者模型l.md)
   * [线程池](./docs/多线程/线程池.md)
   * [Java写一个死锁](./docs/多线程/java写一个死锁.md)
   * [AQS和JUC](./docs/多线程/AQS.md)
@@ -67,6 +66,7 @@
 
   - [基础算法](./docs/算法/基础算法.md)
   - [常用套路](./docs/算法总结.md)
+  - [剑指Offer](./docs/算法/剑指Offer.md)
 * 服务高可用
   - [限流算法](./docs/秒杀相关/限流/限流.md)
   - [Hystrix与Sentinel](./docs/优秀开源框架/Hystrix与sentinel/熔断限流.md)
