@@ -67,4 +67,4 @@ unpkg.com替换为unpkg.zhimg.com
 
 欢迎提出专业方面的修改建议
 
-请直接在[GitHub](https://github.com/HouChenggong/blog-md)上以issue或者PR的形式提出
+请直接在[GitHub](https://github.com/HouChenggong/blog-md)上以issue或者PR的形式提出,如果方便的话也可以添加微信：Yan_Hiiumaa_Eesti
