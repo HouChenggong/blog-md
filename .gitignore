@@ -1,0 +1,44 @@
+
+# Mobile Tools for Java (J2ME)
+.mtj.tmp/
+
+# Package Files #
+*.jar
+*.war
+*.ear
+
+# virtual machine crash logs, see http://www.java.com/en/download/help/error_hotspot.xml
+hs_err_pid*
+
+/.idea/
+.idea/
+*.iml
+.classpath
+.project
+
+
+/leetcode/.idea/
+/leetcode/target/
+/leetcode/*.iml
+/leetcode/*.class
+/leetcode/.settings/
+/leetcode/.classpath
+/leetcode/.project
+/leetcode/.mvn/
+/leetcode/mvnw
+/leetcode/mvnw.cmd
+
+
+
+.idea/
+.idea/.gitignore
+.idea/encodings.xml
+.idea/codeStyles/
+.idea/compiler.xml
+.idea/libraries/
+.idea/misc.xml
+.idea/modules.xml
+.idea/vcs.xml
+.idea/inspectionProfiles/
+.idea/$PRODUCT_WORKSPACE_FILE$
+.idea/workspace.xml
