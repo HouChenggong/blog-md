@@ -1,8 +1,8 @@
 <h1 align="center">希尤丨彦</h1>
 
-行路难，行路难，多歧路，今安在？
+既已择路行舟，佳人同游。
 
-长风破浪会有时，直挂云帆济沧海！
+任起风云几度，浊酒入喉！
 
 [CSDN](https://blog.csdn.net/qq_39455116)
 [GitHub](https://github.com/HouChenggong)
