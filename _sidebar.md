@@ -6,9 +6,7 @@
   * 
   
 * Java
-  * [Java基础](./docs/java基础/java基础问题.md)
-  
-    
+  * [Java基础](./docs/java基础/java基础问题.md)   
   
 * 数据结构
   * [常用数据结构Collection](./docs/java常用数据结构/collection.md)
