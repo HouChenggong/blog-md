@@ -64,5 +64,18 @@ class Service2 {
             }
         }).start();
     }
+    class Service3 {
+    public void call() {
+        System.out.println("==========================");
+        System.out.println("Service3:" + Thread.currentThread().getName());
+        System.out.println("Service3:" + ThreadLocalTest.threadLocal.get());
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                System.out.println("Service3新线程:" + Thread.currentThread().getName());
+                System.out.println("Service3新线程:" + ThreadLocalTest.threadLocal.get());
+            }
+        }).start();
+    }
 }
 
